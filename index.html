@@ -1,0 +1,190 @@
+<html>
+	<head>
+
+		<script src="d3.min.js"></script>
+		<script src="tsne.js"></script>
+		<script src="complex_array.js"></script>
+		<script src="fft.js"></script>
+		<script>
+			
+			var context = null;
+			var musicBuffer = null;
+			var inputData = null;
+			var sampleDuration = null;
+			
+			var lastPlayTime = null;
+			
+			function stepAndDraw(){
+			
+				var steps = d3.select("#Steps").node().value;
+				for(var i = 0; i<steps; i++){
+					tsne.step();
+				}
+				var y = tsne.getSolution();
+				var width = d3.select("svg").attr("width");
+				var height = d3.select("svg").attr("height");
+				
+				
+				circles = d3.select("svg").selectAll("circle");
+				if(y.length != circles.size()){
+					circles
+						.data(y)
+						.enter()
+						.append("circle");
+				}
+				
+				var YxExtent = d3.extent(y, function(d){return d[0];});
+				var YyExtent = d3.extent(y, function(d){return d[1];});
+				
+				var scaleX = d3.scale.linear().domain([YxExtent[0], YxExtent[1]]).range([10,width-10]);
+				var scaleY = d3.scale.linear().domain([YyExtent[0], YyExtent[1]]).range([10,height-10]);
+				
+				d3.select("svg").selectAll("circle")
+					.data(y)
+					.attr("cx",function(d){ return scaleX(d[0]);}) 
+					.attr("cy", function(d){return scaleY(d[1]);}) 
+					.attr("r",3)
+					.style("fill",function(d,i){var greyVal = (i/y.length)*230; return d3.rgb(greyVal,greyVal,greyVal);})
+					.on("mouseover",function(d,i){
+						var snippetDuration = musicBuffer.duration/y.length;
+						var offset = i * snippetDuration;
+						playSound(musicBuffer,offset,1);
+					});
+					
+			}
+			
+			function loadMusicFromBuffer(arrayBuffer){
+				context.decodeAudioData(arrayBuffer, function(audioBuffer){
+							musicBuffer = audioBuffer;
+							var sampleSize = 16384;
+							
+							sampleDuration = sampleSize/musicBuffer.sampleRate;
+							var spectogramData = getDataFromAudioBuffer(musicBuffer, sampleSize);
+							
+							tsne = new tsnejs.tSNE();//{perplexity:30});
+							tsne.initDataRaw(spectogramData);
+							stepAndDraw();
+							
+						},function(e){alert('error' + e)});
+			}
+			
+			function loadMusicFromUrl(musicUrl){
+			
+				musicUrl = musicUrl || document.getElementById("Url").value;
+				
+				var request = new XMLHttpRequest();
+				
+				request.open('GET', musicUrl,true);
+				request.responseType = 'arraybuffer';
+				
+				request.onload = function(){
+				//what we do once we get the music data
+					loadMusicFromBuffer(request.response);
+				}
+				
+				request.send();
+			}
+			
+			function loadMusicFromFile(){
+				var files = document.getElementById('File').files;
+				if (!files.length) {
+				  alert('Please select a file!');
+				  return;
+				}
+
+				var file = files[0];
+
+				var reader = new FileReader();
+
+				// If we use onloadend, we need to check the readyState.
+				reader.onloadend = function(evt) {
+				  if (evt.target.readyState == FileReader.DONE) { // DONE == 2
+					loadMusicFromBuffer(reader.result);
+					
+				  }
+				};
+				
+				reader.readAsArrayBuffer(file);
+			}
+			
+			function getMagnitudesFromComplexArray(cArray,skip){
+				var n = cArray.real.length/2 + 1;
+				var data = new Float32Array(n);
+				skip = skip || 0;
+				for(var i = skip; i<n; i++){
+					var real = cArray.real[i];
+					var imag = cArray.imag[i];
+					data[i] = real*real + imag*imag;
+				}
+				
+				return data;
+			}
+			
+			function getDataFromAudioBuffer(buffer, sampleSize){
+				var datas = [];
+				var bufferData = buffer.getChannelData(0);
+				console.log("Buffer length is " + bufferData.length);
+				var nSamples = Math.floor(bufferData.length/sampleSize);
+				console.log("Number of samples is " + nSamples);
+				
+				var samples = new complex_array.ComplexArray(sampleSize);
+				for(var i = 0; i<nSamples; i++){ 
+				
+					samples.map(function(value,j,n){
+						var sample = bufferData[sampleSize*i+j];
+						value.real = sample;
+						value.imag = 0;
+					});
+					
+					var frequencySpace = samples.FFT();
+					
+					var skipFrequencies = 2000;
+					datas.push(getMagnitudesFromComplexArray(frequencySpace,skipFrequencies));
+				}
+				return datas;
+				
+			}
+			
+			window.addEventListener("load",function(){
+				var audioContext = window.AudioContext || window.webkitAudioContext;
+				context = new audioContext();
+				tsne = new tsnejs.tSNE();
+				
+				var musicUrl = "http://upload.wikimedia.org/wikipedia/en/4/45/ACDC_-_Back_In_Black-sample.ogg";
+				//musicUrl = "http://freedownloads.last.fm/download/571137703/The%2BOnly%2BPlace.mp3"
+				//musicUrl = "http://upload.wikimedia.org/wikipedia/commons/1/1b/The_Entertainer_-_Scott_Joplin.ogg";
+				loadMusicFromUrl(musicUrl);
+			});
+			
+			function playSound(buffer,offset,duration){
+				var source = context.createBufferSource();
+				source.buffer = buffer;
+				source.connect(context.destination);
+
+				source.start(0,offset);
+				soundPlaying = true;
+				setTimeout(function(){source.stop(0);},sampleDuration*1000);
+				//source.stop(duration);
+
+			}
+			
+			
+		</script>
+	</head>
+	<body>
+	<svg id="MySvg" width="500" height="500">
+	</svg>
+	</br>
+	<label for="Steps">Steps <input type="text" id="Steps" value="1"/> </label>
+	<input type="button" id="Step" value="Step And Draw" onclick="stepAndDraw()"/>
+	
+	</br>
+	<input type="file" id="File" value="Upload File" name="file" />
+	<input type="button" id="UseFile" value="Use This File" onclick="loadMusicFromFile()"/>
+	
+	</br>
+	<input type="text" id="Url" value="http://upload.wikimedia.org/wikipedia/commons/1/1b/The_Entertainer_-_Scott_Joplin.ogg"/>
+	<input type="button" id="UseUrl" value="Use This Url" onclick="loadMusicFromUrl()"/>
+
+	</body>
+</html>
