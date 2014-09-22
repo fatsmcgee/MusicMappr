@@ -10,7 +10,7 @@
 			var context = null;
 			var musicBuffer = null;
 			var inputData = null;
-			var sampleDuration = null;
+			var chunkDuration = null;
 			
 			var lastPlayTime = null;
 			
@@ -56,10 +56,10 @@
 			function loadMusicFromBuffer(arrayBuffer){
 				context.decodeAudioData(arrayBuffer, function(audioBuffer){
 							musicBuffer = audioBuffer;
-							var sampleSize = 16384;
+							var chunkLength = 16384;
 							
-							sampleDuration = sampleSize/musicBuffer.sampleRate;
-							var spectogramData = getDataFromAudioBuffer(musicBuffer, sampleSize);
+							chunkDuration = chunkLength/musicBuffer.sampleRate;
+							var spectogramData = getDataFromAudioBuffer(musicBuffer, chunkLength);
 							
 							tsne = new tsnejs.tSNE();//{perplexity:30});
 							tsne.initDataRaw(spectogramData);
@@ -107,11 +107,10 @@
 				reader.readAsArrayBuffer(file);
 			}
 			
-			function getMagnitudesFromComplexArray(cArray,skip){
+			function getMagnitudesFromComplexArray(cArray){
 				var n = cArray.real.length/2 + 1;
 				var data = new Float32Array(n);
-				skip = skip || 0;
-				for(var i = skip; i<n; i++){
+				for(var i = 0; i<n; i++){
 					var real = cArray.real[i];
 					var imag = cArray.imag[i];
 					data[i] = real*real + imag*imag;
@@ -120,26 +119,43 @@
 				return data;
 			}
 			
-			function getDataFromAudioBuffer(buffer, sampleSize){
+			var getFeaturesFromFrequencyMagnitudes(freqMagnitudes,chunkLength){
+			
+				//don't use anything less than 100hz or more than 10000hz
+				var lowFrequencyBar = 100*chunkDuration;
+				var highFrequencyBar = 10000*chunkDuration;
+				
+				for(var i = 0; i<lowFrequencyBar; i++){
+					freqMagnitudes[i] = 0;
+				}
+				for(var i = highFrequencyBar; i<freqMagnitudes.length; i++){
+					freqMagnitudes[i] = 0;
+				}
+				return freqMagnitudes;
+			}
+			
+			function getDataFromAudioBuffer(buffer, chunkLength){
 				var datas = [];
 				var bufferData = buffer.getChannelData(0);
 				console.log("Buffer length is " + bufferData.length);
-				var nSamples = Math.floor(bufferData.length/sampleSize);
-				console.log("Number of samples is " + nSamples);
+				var nChunks = Math.floor(bufferData.length/chunkLength);
+				console.log("Number of samples is " + nChunks);
 				
-				var samples = new complex_array.ComplexArray(sampleSize);
-				for(var i = 0; i<nSamples; i++){ 
+				var samples = new complex_array.ComplexArray(chunkLength);
+				for(var i = 0; i<nChunks; i++){
 				
 					samples.map(function(value,j,n){
-						var sample = bufferData[sampleSize*i+j];
+						var sample = bufferData[chunkLength*i+j];
 						value.real = sample;
 						value.imag = 0;
 					});
 					
 					var frequencySpace = samples.FFT();
 					
-					var skipFrequencies = 2000;
-					datas.push(getMagnitudesFromComplexArray(frequencySpace,skipFrequencies));
+					var frequencyMagnitudes = getMagnitudesFromComplexArray(frequencySpace);
+					var features = getFeaturesFromFrequencyMagnitudes(frequencyMagnitudes);
+					
+					datas.push(features);
 				}
 				return datas;
 				
@@ -163,7 +179,7 @@
 
 				source.start(0,offset);
 				soundPlaying = true;
-				setTimeout(function(){source.stop(0);},sampleDuration*1000);
+				setTimeout(function(){source.stop(0);},chunkDuration*1000);
 				//source.stop(duration);
 
 			}
