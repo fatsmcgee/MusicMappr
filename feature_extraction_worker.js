@@ -1,4 +1,4 @@
-importScripts('complex_array.js','fft.js');   
+importScripts('complex_array.js','fft.js','feature_extractor.js');   
 
 function melFromHertz(hz){
 				return 1127*Math.log(1+hz/700);
@@ -73,21 +73,8 @@ Expects input of form:
 onmessage = function (event) {
   var input = event.data;
   
-  var realValues = input.samples;
+  var samples = input.samples;
   
-  var samples = new complex_array.ComplexArray(realValues.length);
-  for(var i = 0; i<realValues.length; i++){
-	samples.real[i] = realValues[i];
-	samples.imag[i] = 0;
-  }
-  
-
-  var fft = samples.FFT();
-
-  var fftMagnitudes =  getMagnitudesFromComplexArray(fft);
-
-  var features = getFeaturesFromFrequencyMagnitudes(fftMagnitudes,input.chunkDuration);
-  
-  var output = {features:features, chunkNo:input.chunkNo};
+  var output = {features:feature_extractor.getFeatures(samples,input.chunkDuration), chunkNo:input.chunkNo};
   postMessage(output);
 };

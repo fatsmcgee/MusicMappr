@@ -109,19 +109,6 @@
 				reader.readAsArrayBuffer(file);
 			}
 			
-			function getMagnitudesFromComplexArray(cArray){
-				var n = cArray.real.length/2 + 1;
-				var data = new Float32Array(n);
-				for(var i = 0; i<n; i++){
-					var real = cArray.real[i];
-					var imag = cArray.imag[i];
-					data[i] = real*real + imag*imag;
-				}
-				
-				return data;
-			}
-			
-			
 			//getDataFromAudioBufferAsync(musicBuffer, 16384, function(datas){blah = datas;});
 			//continuation should be a function(dataArray), where dataArray is an array of feature arrays
 			function getDataFromAudioBufferAsync(buffer, chunkLength, continuation){
@@ -143,7 +130,9 @@
 					var output = evt.data;
 					datas[output.chunkNo] = output.features;  
 					if(++processedChunks == nChunks){
+						blah = datas;
 						continuation(datas);
+						
 					}
 				}
 				
