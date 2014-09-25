@@ -14,6 +14,11 @@
 			
 			var lastPlayTime = null;
 			
+			function animateSteps(){
+				requestAnimationFrame(animateSteps);
+				stepAndDraw();
+			}
+			
 			function stepAndDraw(){
 			
 				var steps = d3.select("#Steps").node().value;
@@ -190,6 +195,7 @@
 	</br>
 	<label for="Steps">Steps <input type="text" id="Steps" value="1"/> </label>
 	<input type="button" id="Step" value="Step And Draw" onclick="stepAndDraw()"/>
+	<input type="button" id="Animate" value="Animate" onclick="animateSteps()"/>
 	
 	</br>
 	<input type="file" id="File" value="Upload File" name="file" />
