@@ -92,4 +92,8 @@ PointCloudVisualizer.prototype.deHighlightIdx = function(idx){
 		.attr("r",3);
 }
 
+PointCloudVisualizer.prototype._getKMeans(){
+
+}
+
 

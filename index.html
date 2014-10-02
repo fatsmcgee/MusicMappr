@@ -8,6 +8,7 @@
 		<script src="PointCloudVisualizer.js"></script>
 		<script src="SongAmplitudeVisualizer.js"></script>
 		<script src="TsneMusicVisualizer.js"></script>
+		<script src="figue.js"></script>
 		
 		<script>
 			
@@ -24,8 +25,21 @@
 					tsneMusicVisualizer.loadMusicFromUrl(d3.select('#Url').attr('value'));
 				});
 				
-				d3.select("#Animate").on("click",function(){
-					tsneMusicVisualizer.animate();
+				d3.select("#AnimateStop").on("click",function(){
+					//if we click "Animate", start animation and set label to "Stop"
+					var self = this;
+					if(this.value==="Animate"){
+						tsneMusicVisualizer.animate(function(){
+							//when animation stops, change button back to "Animate"
+							self.value = "Animate";
+						});
+						
+						this.value = "Stop";
+					}
+					else{
+						tsneMusicVisualizer.stopAnimate();
+						self.value = "Animate";
+					}
 				});
 				
 				d3.select("#Step").on("click",function(){
@@ -46,7 +60,7 @@
 	</br>
 	<label for="Steps">Steps <input type="text" id="Steps" value="1"/> </label>
 	<input type="button" id="Step" value="Step And Draw" />
-	<input type="button" id="Animate" value="Animate"/>
+	<input type="button" id="AnimateStop" value="Animate"/>
 	
 	</br>
 	<input type="file" id="File" value="Upload File" name="file" />

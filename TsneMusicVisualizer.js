@@ -5,6 +5,12 @@ function TsneMusicVisualizer(pointCloudSvgNode,songVisualizerSvgNode){
 	this._tsne = new tsnejs.tSNE();
 	var AudioContext = window.AudioContext || window.webkitAudioContext;
 	this._audioContext = new AudioContext();
+	this._animating = false;
+	this._stopAnimatingSwitch = false;
+	
+	//criteria for stopping in terms of T-SNE cost difference
+	this._epsilon = Math.pow(10,-15);
+	
 	
 	//initialize the point cloud visualizer's visual settings
 	this._pointCloud = new PointCloudVisualizer(pointCloudSvgNode);
@@ -38,6 +44,9 @@ function TsneMusicVisualizer(pointCloudSvgNode,songVisualizerSvgNode){
 	this._musicBuffer = null;
 	this._chunkLength = null;
 	this._chunkDuration = null;
+	
+	//unitialized until TSNE is loaded
+	this._lastCost = null;
 }
 
 TsneMusicVisualizer.prototype._chunkColoringFunction = function(chunkIdx,numChunks){
@@ -122,6 +131,12 @@ TsneMusicVisualizer.prototype._updateSongVisualizer = function(){
 	this._songAmplitudeViz.update(chunkAvgAmplitudes);
 	this._songAmplitudeViz.render();
 }
+
+TsneMusicVisualizer.prototype._initTsne = function(featureData){
+	this._tsne.initDataRaw(featureData);
+	this._lastCost = Number.MAX_VALUE;
+}
+
 TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer){
 
 	var self = this;
@@ -132,7 +147,7 @@ TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer){
 		self._bufferData = audioBuffer.getChannelData(0);
 
 		self._getFeaturesFromMusicBufferAsync(function(spectogramData){
-			self._tsne.initDataRaw(spectogramData);
+			self._initTsne(spectogramData);
 			self.stepAndDraw();
 		});
 		
@@ -190,11 +205,19 @@ TsneMusicVisualizer.prototype._getFeaturesFromMusicBufferAsync = function(contin
 
 TsneMusicVisualizer.prototype.step = function(steps){
 	var steps = steps || 1;
+	
 	for(var i = 0; i<steps; i++){
-		this._tsne.step();
+		var cost = this._tsne.step();
 	}
+	
+	var costDiff = cost-this._lastCost;
+	this._lastCost = cost;
+	
 	var newPoints = this._tsne.getSolution();
 	this._pointCloud.update(newPoints);
+	
+	//console.log(costDiff);
+	return Math.abs(costDiff);
 }
 
 TsneMusicVisualizer.prototype.draw = function(){
@@ -202,13 +225,27 @@ TsneMusicVisualizer.prototype.draw = function(){
 }
 
 TsneMusicVisualizer.prototype.stepAndDraw = function(){
-	this.step();
+	var costDiff = this.step();
 	this.draw();
+	return costDiff;
 }
 
-TsneMusicVisualizer.prototype.animate = function(){
-	requestAnimationFrame(this.animate.bind(this));
-	this.stepAndDraw(1);
+
+TsneMusicVisualizer.prototype.stopAnimate = function(){
+	this._stopAnimatingSwitch = true;
+}
+
+TsneMusicVisualizer.prototype.animate = function(stopContinuation){
+	var costDiff = this.stepAndDraw(1);
+	if((costDiff < this._epsilon) || this._stopAnimatingSwitch){
+		this._animating =false;
+		this._stopAnimatingSwitch = false;
+		stopContinuation && stopContinuation();
+		return;
+	}
+	this._animating = true;
+	requestAnimationFrame(this.animate.bind(this,stopContinuation));
+	
 }
 
 
