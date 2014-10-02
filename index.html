@@ -6,17 +6,18 @@
 		<script src="complex_array.js"></script>
 		<script src="fft.js"></script>
 		<script src="PointCloudVisualizer.js"></script>
+		<script src="SongAmplitudeVisualizer.js"></script>
 		<script src="TsneMusicVisualizer.js"></script>
 		
 		<script>
 			
 			window.addEventListener("load",function(){
-				tsneMusicVisualizer = new TsneMusicVisualizer("#PointsSvg");
+				tsneMusicVisualizer = new TsneMusicVisualizer("#PointsSvg","#SongSvg");
 				var musicUrl = "http://upload.wikimedia.org/wikipedia/en/4/45/ACDC_-_Back_In_Black-sample.ogg";
 				tsneMusicVisualizer.loadMusicFromUrl(musicUrl);
 				
 				d3.select("#UseFile").on("click",function(){
-					tsneMusicVisualizer.loadMusicFromFileNode(this);
+					tsneMusicVisualizer.loadMusicFromFileNode(d3.select("#File"));
 				});
 				
 				d3.select("#UseUrl").on("click",function(){
@@ -36,8 +37,12 @@
 		</script>
 	</head>
 	<body>
-	<svg id="PointsSvg" width="500" height="500">
+	<svg id="PointsSvg" width="500" height="500" style="border: 1px solid green">
 	</svg>
+	
+	<svg id="SongSvg" width="700" height="200" style="border: 1px solid orange">
+	</svg>
+	
 	</br>
 	<label for="Steps">Steps <input type="text" id="Steps" value="1"/> </label>
 	<input type="button" id="Step" value="Step And Draw" />

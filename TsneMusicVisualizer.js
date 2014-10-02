@@ -1,5 +1,5 @@
 
-function TsneMusicVisualizer(pointCloudSvgNode){
+function TsneMusicVisualizer(pointCloudSvgNode,songVisualizerSvgNode){
 	
 	var self = this;
 	this._tsne = new tsnejs.tSNE();
@@ -10,20 +10,44 @@ function TsneMusicVisualizer(pointCloudSvgNode){
 	this._pointCloud = new PointCloudVisualizer(pointCloudSvgNode);
 	
 	//music chunks later in the song are colored lighter
-	this._pointCloud.setColoringFunction(function(p,chunkIdx,numChunks){
-		var greyVal = (chunkIdx/numChunks)*230; 
-		return d3.rgb(greyVal,greyVal,greyVal);
+	this._pointCloud.setColoringFunction(this._chunkColoringFunction);
+	this._pointCloud.setMouseoverPointFunction(this._chunkMouseoverFunction.bind(this));
+	//when point cloud has a chunk highlighted, song amplitude viz should also highlight it (and vice versa)
+	this._pointCloud.setHighlightedCallback(function(i){
+		self._songAmplitudeViz.highlightIdx(i);
+	});
+	this._pointCloud.setDeHighlightedCallback(function(i){
+		self._songAmplitudeViz.deHighlightIdx(i);
 	});
 	
-	this._pointCloud.setMouseoverPointFunction(function(p,chunkIdx,numChunks){
-		var offset = chunkIdx * self._chunkDuration;
-		self._playSound(offset);
+	//initialize the sound amplitude visualizer settings
+	this._songAmplitudeViz = new SongAmplitudeVisualizer(songVisualizerSvgNode);
+	//for now, use same mouseover and coloring behavior as point cloud
+	this._songAmplitudeViz.setColoringFunction(this._chunkColoringFunction);
+	this._songAmplitudeViz.setMouseoverPointFunction(this._chunkMouseoverFunction.bind(this));
+	this._songAmplitudeViz.setHighlightedCallback(function(i){
+		self._pointCloud.highlightIdx(i);
 	});
+	this._songAmplitudeViz.setDeHighlightedCallback(function(i){
+		self._pointCloud.deHighlightIdx(i);
+	});
+	
+	
 	
 	//following variables unitialized until music is loaded
 	this._musicBuffer = null;
 	this._chunkLength = null;
 	this._chunkDuration = null;
+}
+
+TsneMusicVisualizer.prototype._chunkColoringFunction = function(chunkIdx,numChunks){
+	var greyVal = (chunkIdx/numChunks)*230; 
+	return d3.rgb(greyVal,greyVal,greyVal);
+}
+
+TsneMusicVisualizer.prototype._chunkMouseoverFunction  = function(chunkIdx,numChunks){
+	var offset = chunkIdx * this._chunkDuration;
+	this._playSound(offset);
 }
 
 TsneMusicVisualizer.prototype._playSound = function(offset){
@@ -55,7 +79,7 @@ TsneMusicVisualizer.prototype.loadMusicFromUrl = function(musicUrl){
 }
 
 TsneMusicVisualizer.prototype.loadMusicFromFileNode = function(fileNode){
-	var files = d3.select(fileNode).node().files;
+	var files = fileNode.node().files;
 	if (!files.length) {
 	  alert('Please select a file!');
 	  return;
@@ -75,6 +99,29 @@ TsneMusicVisualizer.prototype.loadMusicFromFileNode = function(fileNode){
 	reader.readAsArrayBuffer(file);
 }
 
+TsneMusicVisualizer.prototype._getNChunks = function(){
+	return Math.floor(this._bufferData.length/this._chunkLength);
+}
+
+TsneMusicVisualizer.prototype._updateSongVisualizer = function(){
+	//now get the chunk amplitudes to feed into the song visualizer
+	var chunkAvgAmplitudes = new Float32Array(this._getNChunks());
+	bufferData = this._bufferData; //tight loop optimizations, avoid member lookup
+	var chunkLength = this._chunkLength;
+	
+	for(var i = 0,idx=0; i< bufferData.length; i+= chunkLength,idx++){
+		var chunkTotal = 0;
+		
+		for (var j = i; j<i+chunkLength; j++){
+			var sample = bufferData[j];
+			chunkTotal += sample || 0;
+		}
+		chunkAvgAmplitudes[idx] = chunkTotal;
+	}
+	
+	this._songAmplitudeViz.update(chunkAvgAmplitudes);
+	this._songAmplitudeViz.render();
+}
 TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer){
 
 	var self = this;
@@ -82,21 +129,24 @@ TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer){
 		self._musicBuffer = audioBuffer;
 		self._chunkLength = 16384;
 		self._chunkDuration = self._chunkLength/audioBuffer.sampleRate;
+		self._bufferData = audioBuffer.getChannelData(0);
 
-		self._getDataFromMusicBufferAsync(function(spectogramData){
+		self._getFeaturesFromMusicBufferAsync(function(spectogramData){
 			self._tsne.initDataRaw(spectogramData);
 			self.stepAndDraw();
 		});
+		
+		self._updateSongVisualizer();
 		
 	},function(e){alert('error' + e)});
 }
 
 //continuation(dataArray) should be a function that takes dataArray, an array of feature arrays,
 //and performs some action on them when ready
-TsneMusicVisualizer.prototype._getDataFromMusicBufferAsync = function(continuation){
+TsneMusicVisualizer.prototype._getFeaturesFromMusicBufferAsync = function(continuation){
 	
 	var chunkLength = this._chunkLength;
-	var bufferData = this._musicBuffer.getChannelData(0);
+	var bufferData = this._bufferData;
 	//console.log("Buffer length is " + bufferData.length);
 	var nChunks = Math.floor(bufferData.length/chunkLength);
 	//console.log("Number of samples is " + nChunks);
