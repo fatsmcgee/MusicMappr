@@ -15,7 +15,7 @@
 				for(var i = 0; i<n; i++){
 					var real = cArray.real[i];
 					var imag = cArray.imag[i];
-					data[i] = real*real + imag*imag;
+					data[i] = Math.sqrt(real*real + imag*imag);
 				}
 				
 				return data;
@@ -27,6 +27,8 @@
 		var lowFrequencyBar = 100*chunkDuration;
 		var highFrequencyBar = 10000*chunkDuration;
 		
+		
+		//TODO: loop over good parts of array rather than killing bad parts
 		for(var i = 0; i<lowFrequencyBar; i++){
 			freqMagnitudes[i] = 0;
 		}
