@@ -2,6 +2,29 @@
 
 function PointCloudVisualizer(svgNode){
 	this._svgNode = d3.select(svgNode);
+	this._kMeansClusters = 26;
+	
+	//set once a given set of points has been rendered
+	this._scaleX = null;
+	this._scaleY = null;
+	
+	var self = this;
+	var keysDown = {};
+	d3.select("body").on("keydown.PointCloud", function(){
+		
+		var clusterIdx = d3.event.keyCode - 65;
+		if(keysDown[clusterIdx]){
+			return;
+		}
+		self._indicesByCluster && self._toggleClusterCallback && self._toggleClusterCallback(clusterIdx,self._indicesByCluster[clusterIdx]);
+		keysDown[clusterIdx] = true;
+	});
+	
+	d3.select("body").on("keyup.PointCloud", function(){
+		var clusterIdx = d3.event.keyCode - 65;
+		keysDown[clusterIdx] = false;
+		self._indicesByCluster && self._deToggleClusterCallback && self._deToggleClusterCallback(clusterIdx);
+	});
 }
 
 //points: an array of 2-element arrays, where the first element = the x coordinate and the second element = the y coordinate
@@ -22,7 +45,10 @@ PointCloudVisualizer.prototype.draw = function(){
 	
 	var points = this._points;
 	
-	circles = d3.select("svg").selectAll("circle");
+	//eliminate the k-means graphics
+	this._svgNode.selectAll("path").remove();
+	
+	var circles = this._svgNode.selectAll("circle");
 	if(points.length != circles.size()){
 		circles
 			.data(points)
@@ -36,8 +62,8 @@ PointCloudVisualizer.prototype.draw = function(){
 	
 	//Give a margin of 10 to each side of our screen
 	var screenMargin = 10;
-	var scaleX = d3.scale.linear().domain([YxExtent[0], YxExtent[1]]).range([screenMargin,width-screenMargin]);
-	var scaleY = d3.scale.linear().domain([YyExtent[0], YyExtent[1]]).range([screenMargin,height-screenMargin]);
+	var scaleX = this._scaleX = d3.scale.linear().domain([YxExtent[0], YxExtent[1]]).range([screenMargin,width-screenMargin]);
+	var scaleY = this._scaleY =  d3.scale.linear().domain([YyExtent[0], YyExtent[1]]).range([screenMargin,height-screenMargin]);
 	
 	d3.select("svg").selectAll("circle")
 		.data(points)
@@ -78,6 +104,16 @@ PointCloudVisualizer.prototype.setDeHighlightedCallback = function(deHighlighted
 	this._deHighlightedCallback = deHighlightedCallback;
 }
 
+//calback(clusterIdx,clusterIndices)
+PointCloudVisualizer.prototype.setToggleClusterCallback = function (toggleClusterCallback){
+	this._toggleClusterCallback = toggleClusterCallback;
+}
+
+//callback(clusterIdx)
+PointCloudVisualizer.prototype.setDeToggleClusterCallback = function(deToggleClusterCallback){
+	this._deToggleClusterCallback = deToggleClusterCallback;
+};
+
 PointCloudVisualizer.prototype.highlightIdx = function(idx){
 	this._svgNode.select("circle._" + idx)
 		.style("fill",d3.rgb(255,0,0))
@@ -92,8 +128,54 @@ PointCloudVisualizer.prototype.deHighlightIdx = function(idx){
 		.attr("r",3);
 }
 
-PointCloudVisualizer.prototype._getKMeans(){
+PointCloudVisualizer.prototype.getKMeans = function(){
 
+	var self = this;
+	var nClusters = this._kMeansClusters;
+	var kmeans = figue.kmeans(nClusters,this._points);
+	
+	var indicesByCluster= {};
+	convexHullByCluster = {};
+	d3.range(nClusters).forEach(function(i){
+		indicesByCluster[i] = [];
+	});
+	
+	for(var i = 0; i<this._points.length; i++){
+		var assignment = kmeans.assignments[i];
+		indicesByCluster[assignment].push(i);
+	}
+	
+	this._indicesByCluster = indicesByCluster;
+
+	for(var i = 0; i<nClusters; i++){
+		var cluster = indicesByCluster[i];
+		
+		var convexHull = new ConvexHullGrahamScan();
+		
+		
+		cluster.forEach(function(pointIdx){
+			var point =	self._points[pointIdx];
+			convexHull.addPoint(point[0],point[1]);
+		});
+		hullPoints = convexHull.getHull();
+		convexHullByCluster[i] = hullPoints;
+	}
+	
+	var lineFunction = d3.svg.line()
+		.x(function(p) { return self._scaleX(p.x); })
+		.y(function(p) { return self._scaleY(p.y); })
+		.interpolate("basis-closed");
+		
+	
+	for(var i = 0; i<nClusters; i++){
+	
+		var lineGraph = this._svgNode.append("path")
+			.attr("d", lineFunction(convexHullByCluster[i]))
+			.attr("stroke", "blue")
+			.attr("stroke-width", 2)
+			.attr("fill", "none");
+	}
+	
 }
 
 
