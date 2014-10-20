@@ -1,7 +1,6 @@
 
+
 function TsneMusicVisualizer(pointCloudSvgNode,songVisualizerSvgNode){
-	
-	var self = this;
 	this._tsne = new tsnejs.tSNE();
 	var AudioContext = window.AudioContext || window.webkitAudioContext;
 	this._audioContext = new AudioContext();
@@ -11,59 +10,22 @@ function TsneMusicVisualizer(pointCloudSvgNode,songVisualizerSvgNode){
 	//criteria for stopping in terms of T-SNE cost difference
 	this._epsilon = Math.pow(10,-15);
 	
+	//initialize the point cloud
+	this.initializePointCloud(pointCloudSvgNode);
+	this.initializeSongAmplitudeVisualizer(songVisualizerSvgNode);
 	
-	//initialize the point cloud visualizer's visual settings
-	this._pointCloud = new PointCloudVisualizer(pointCloudSvgNode);
 	
-	//music chunks later in the song are colored lighter
-	this._pointCloud.setColoringFunction(this._chunkColoringFunction);
-	this._pointCloud.setMouseoverPointFunction(this._chunkMouseoverFunction.bind(this));
-	//when point cloud has a chunk highlighted, song amplitude viz should also highlight it (and vice versa)
-	this._pointCloud.setHighlightedCallback(function(i){
-		self._songAmplitudeViz.highlightIdx(i);
-	});
-	this._pointCloud.setDeHighlightedCallback(function(i){
-		self._songAmplitudeViz.deHighlightIdx(i);
-	});
+	//following variables unitialized until music is loaded
+	this._musicBuffer = null;
+	this._chunkLength = null;
+	this._chunkDuration = null;
 	
-	this._playThroughClusterStopTrigger = {};
-	
-	/*
-	TsneMusicVisualizer.prototype._chunkMouseoverFunction  = function(chunkIdx,numChunks){
-	var offset = chunkIdx * this._chunkDuration;
-	this._playSound(offset);
+	//unitialized until TSNE is loaded
+	this._lastCost = null;
 }
 
-TsneMusicVisualizer.prototype._playSound = function(offset){
-*/
-
-	this._pointCloud.setToggleClusterCallback(function(clusterIdx,clusterIndices){
-		self._playThroughClusterStopTrigger[clusterIdx] = false;
-		function timeout(i,lastIdx){
-			//console.log("here");
-			//console.log(self._chunkDuration);
-			if(self._playThroughClusterStopTrigger[clusterIdx] === true){
-				return;
-			}
-			var chunkIdx = clusterIndices[i];
-			var offset = chunkIdx * self._chunkDuration;
-			self._playSound(offset);
-			self._pointCloud.deHighlightIdx(lastIdx);
-			self._pointCloud.highlightIdx(chunkIdx);
-			
-			//play the next available chunk
-			i = (i+1) % clusterIndices.length;
-			console.log(i);
-			setTimeout(timeout.bind(self,i,chunkIdx),self._chunkDuration*1000);
-		}
-		
-		timeout(0);
-	});
-	
-	this._pointCloud.setDeToggleClusterCallback(function(clusterIdx){
-		self._playThroughClusterStopTrigger[clusterIdx] = true;
-	});
-	
+TsneMusicVisualizer.prototype.initializeSongAmplitudeVisualizer = function(songVisualizerSvgNode){
+	var self = this;
 	//initialize the sound amplitude visualizer settings
 	this._songAmplitudeViz = new SongAmplitudeVisualizer(songVisualizerSvgNode);
 	//for now, use same mouseover and coloring behavior as point cloud
@@ -75,16 +37,53 @@ TsneMusicVisualizer.prototype._playSound = function(offset){
 	this._songAmplitudeViz.setDeHighlightedCallback(function(i){
 		self._pointCloud.deHighlightIdx(i);
 	});
+}
+
+TsneMusicVisualizer.prototype.initializePointCloud = function(pointCloudSvgNode){
+	var self = this;
 	
+	this._pointCloud = new PointCloudVisualizer(pointCloudSvgNode);
 	
+	//music chunks later in the song are colored lighter
+	this._pointCloud.setColoringFunction(this._chunkColoringFunction);
+	this._pointCloud.setMouseoverPointFunction(this._chunkMouseoverFunction.bind(this));
+	//when point cloud has a chunk highlighted, song amplitude visualizer should also highlight it
+	this._pointCloud.setHighlightedCallback(function(i){
+		self._songAmplitudeViz.highlightIdx(i);
+	});
+	this._pointCloud.setDeHighlightedCallback(function(i){
+		self._songAmplitudeViz.deHighlightIdx(i);
+	});
 	
-	//following variables unitialized until music is loaded
-	this._musicBuffer = null;
-	this._chunkLength = null;
-	this._chunkDuration = null;
+	this._playThroughClusterStopTrigger = {};
 	
-	//unitialized until TSNE is loaded
-	this._lastCost = null;
+	var playThroughClusterStopTrigger = {};
+
+	this._pointCloud.setToggleClusterCallback(function(clusterIdx,clusterIndices){
+		playThroughClusterStopTrigger[clusterIdx] = false;
+		function timeout(i,lastIdx){
+			self._pointCloud.deHighlightIdx(lastIdx);
+			
+			if(self._playThroughClusterStopTrigger[clusterIdx] === true){
+				return;
+			}
+			var chunkIdx = clusterIndices[i];
+			var offset = chunkIdx * self._chunkDuration;
+			self._playSound(offset);
+			
+			self._pointCloud.highlightIdx(chunkIdx);
+			
+			//play the next available chunk
+			i = (i+1) % clusterIndices.length;
+			setTimeout(timeout.bind(self,i,chunkIdx),self._chunkDuration*1000);
+		}
+		
+		timeout(0);
+	});
+	
+	this._pointCloud.setDeToggleClusterCallback(function(clusterIdx){
+		self._playThroughClusterStopTrigger[clusterIdx] = true;
+	});
 }
 
 TsneMusicVisualizer.prototype._chunkColoringFunction = function(chunkIdx,numChunks){
