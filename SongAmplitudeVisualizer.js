@@ -129,6 +129,7 @@ SongAmplitudeVisualizer.prototype.highlightIdx = function(amplitudeIdx,x){
 	
 	var svgWidth = this._svgNode.attr("width");
 	var width = ~~(svgWidth/nAmplitudes);
+	width = Math.max(width,2);
 	
 	this._svgNode.append("rect")
 	.attr("class","highlight _" + amplitudeIdx)

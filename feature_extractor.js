@@ -24,7 +24,7 @@
 	function getFeaturesFromFrequencyMagnitudes(freqMagnitudes,chunkDuration){
 
 		//don't use anything less than 100hz or more than 10000hz
-		var lowFrequencyBar = 100*chunkDuration;
+		var lowFrequencyBar = 20*chunkDuration;
 		var highFrequencyBar = 10000*chunkDuration;
 		
 		
