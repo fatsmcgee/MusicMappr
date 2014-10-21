@@ -12,7 +12,7 @@ function PointCloudVisualizer(svgNode){
 	d3.select("body").on("keydown.PointCloud", function(){
 		var clusterIdx = d3.event.keyCode - 65;
 		//only respond to characters a-z
-		if(clusterIdx <0 || clusterIdx > this._kMeansClusters){
+		if(clusterIdx <0 || clusterIdx > self._kMeansClusters){
 			return;
 		}
 		
@@ -27,7 +27,7 @@ function PointCloudVisualizer(svgNode){
 		var clusterIdx = d3.event.keyCode - 65;
 		keysDown[clusterIdx] = false;
 		
-		if(clusterIdx <0 || clusterIdx > this._kMeansClusters){
+		if(clusterIdx <0 || clusterIdx > self._kMeansClusters){
 			return;
 		}
 		

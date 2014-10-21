@@ -126,7 +126,6 @@ SongAmplitudeVisualizer.prototype.highlightIdx = function(amplitudeIdx,x){
 	var nAmplitudes = this._amplitudes.length;
 	var idxToX = this._getIndexScaler(nAmplitudes);
 	var x = x || idxToX(amplitudeIdx);
-	console.log(x);
 	
 	var svgWidth = this._svgNode.attr("width");
 	var width = ~~(svgWidth/nAmplitudes);

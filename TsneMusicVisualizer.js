@@ -108,7 +108,7 @@ TsneMusicVisualizer.prototype._playSound = function(offset){
 }
 
 			
-TsneMusicVisualizer.prototype.loadMusicFromUrl = function(musicUrl){
+TsneMusicVisualizer.prototype.loadMusicFromUrl = function(musicUrl,bpm,beatOffset){
 	musicUrl = musicUrl;
 	
 	var request = new XMLHttpRequest();
@@ -118,13 +118,13 @@ TsneMusicVisualizer.prototype.loadMusicFromUrl = function(musicUrl){
 	
 	var self = this;
 	request.onload = function(){
-		self._loadMusicFromBuffer(request.response);
+		self._loadMusicFromBuffer(request.response,bpm,beatOffset);
 	}
 	
 	request.send();
 }
 
-TsneMusicVisualizer.prototype.loadMusicFromFileNode = function(fileNode){
+TsneMusicVisualizer.prototype.loadMusicFromFileNode = function(fileNode, bpm, beatOffset){
 	var files = fileNode.node().files;
 	if (!files.length) {
 	  alert('Please select a file!');
@@ -138,7 +138,7 @@ TsneMusicVisualizer.prototype.loadMusicFromFileNode = function(fileNode){
 	var self = this;
 	reader.onloadend = function(evt) {
 	  if (evt.target.readyState == FileReader.DONE) { // DONE == 2
-		self._loadMusicFromBuffer(reader.result);
+		self._loadMusicFromBuffer(reader.result, bpm,beatOffset);
 		
 	  }
 	};
@@ -174,16 +174,44 @@ TsneMusicVisualizer.prototype._initTsne = function(featureData){
 	this._lastCost = Number.MAX_VALUE;
 }
 
-TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer){
+//Return a sample length that is a power of two fraction of the actual beat length
+TsneMusicVisualizer.prototype._getSampleLengthFromBpm = function(sampleRate,bpm,maxChunkSize){
+	var bps = bpm/60;
+	var samplesPerBeat = sampleRate/bps;
+	//use either beats or half beats or quarter beats etc...
+	while(samplesPerBeat > maxChunkSize){
+		samplesPerBeat/=2;
+	}
+	samplesPerBeat = ~~samplesPerBeat; 
+	return samplesPerBeat;
+}
+
+TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer, bpm,beatOffset){
 
 	var self = this;
 	this._audioContext.decodeAudioData(arrayBuffer, function(audioBuffer){
 		self._musicBuffer = audioBuffer;
-		self._chunkLength = 16384;
+		
+		var fftInputSize = 16384;
+		
+		if(bpm === undefined){
+			self._chunkLength = fftInputSize;
+			console.log("Not using bpm");
+		}
+		else{
+			self._chunkLength = self._getSampleLengthFromBpm(audioBuffer.sampleRate, bpm, fftInputSize);
+			console.log("Using bpm with chunk length = " + self._chunkLength);
+		}
+		
+		var fftPadding = fftInputSize - self._chunkLength;
+		
 		self._chunkDuration = self._chunkLength/audioBuffer.sampleRate;
 		self._bufferData = audioBuffer.getChannelData(0);
 
-		self._getFeaturesFromMusicBufferAsync(function(spectogramData){
+		var start = new Date();
+		self._getFeaturesFromMusicBufferAsync(fftPadding,function(spectogramData){
+			var duration = ((new Date())-start)/1000;
+			console.log("Features took " + duration + " seconds to compute");
 			self._initTsne(spectogramData);
 			self.stepAndDraw();
 		});
@@ -195,13 +223,12 @@ TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer){
 
 //continuation(dataArray) should be a function that takes dataArray, an array of feature arrays,
 //and performs some action on them when ready
-TsneMusicVisualizer.prototype._getFeaturesFromMusicBufferAsync = function(continuation){
+//TODO: instead of chunk padding, make into a more general feature extraction parameter object?
+TsneMusicVisualizer.prototype._getFeaturesFromMusicBufferAsync = function(fftPadding,continuation){
 	
 	var chunkLength = this._chunkLength;
 	var bufferData = this._bufferData;
-	//console.log("Buffer length is " + bufferData.length);
 	var nChunks = Math.floor(bufferData.length/chunkLength);
-	//console.log("Number of samples is " + nChunks);
 	
 	
 	var datas = new Array(nChunks);
@@ -210,12 +237,13 @@ TsneMusicVisualizer.prototype._getFeaturesFromMusicBufferAsync = function(contin
 	var numWorkers = 4;
 	var fftWorkers = [];
 	
+	//event responding to a worker finishing its work and giving us output
+	//when all chunks have been processed we're done
 	function onWorkerMessage(evt){
 
 		var output = evt.data;
 		datas[output.chunkNo] = output.features;  
 		if(++processedChunks == nChunks){
-			blah = datas;
 			continuation(datas);
 			
 		}
@@ -227,7 +255,12 @@ TsneMusicVisualizer.prototype._getFeaturesFromMusicBufferAsync = function(contin
 	}
 	
 	//raw sample data to be passed into webworker
-	var samples = new Float32Array(chunkLength);
+	//Go up to actual chunk length, and make the rest zeros (need to pad to power of 2 for faster fft)
+	var samples = new Float32Array(chunkLength+fftPadding);
+	
+	//the effective duration of the samples we pass to fft. Even though fftPadding of these samples are zero, still need to use the correct effective duration
+	//to make sure right frequencies are selected
+	var fftChunkDuration = (chunkLength+fftPadding)/this._musicBuffer.sampleRate;
 	
 	for(var i = 0; i<nChunks; i++){
 	
@@ -236,7 +269,7 @@ TsneMusicVisualizer.prototype._getFeaturesFromMusicBufferAsync = function(contin
 		}
 		
 		var worker = fftWorkers[i%numWorkers];
-		worker.postMessage({chunkNo:i, samples:samples, chunkDuration:this._chunkDuration});
+		worker.postMessage({chunkNo:i, samples:samples, chunkDuration:fftChunkDuration});
 	}
 }
 
@@ -253,7 +286,6 @@ TsneMusicVisualizer.prototype.step = function(steps){
 	var newPoints = this._tsne.getSolution();
 	this._pointCloud.update(newPoints);
 	
-	//console.log(costDiff);
 	return Math.abs(costDiff);
 }
 

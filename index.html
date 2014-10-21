@@ -13,17 +13,35 @@
 		
 		<script>
 			
+			function getBPM(){
+				var text = d3.select("#BPM").node().value;
+				var bpm = parseFloat(text);
+				if (!isNaN(bpm)){
+					return bpm;
+				}
+				return undefined;
+			}
+			
+			function getBeatOffset(){
+				var text = d3.select("#BeatOffset").node().value;
+				var offset = parseFloat(text);
+				if (!isNaN(offset)){
+					return offset;
+				}
+				return undefined;
+			}
+			
 			window.addEventListener("load",function(){
 				tsneMusicVisualizer = new TsneMusicVisualizer("#PointsSvg","#SongSvg");
 				var musicUrl = "http://upload.wikimedia.org/wikipedia/en/4/45/ACDC_-_Back_In_Black-sample.ogg";
-				tsneMusicVisualizer.loadMusicFromUrl(musicUrl);
+				tsneMusicVisualizer.loadMusicFromUrl(musicUrl,getBPM(),getBeatOffset());
 				
 				d3.select("#UseFile").on("click",function(){
-					tsneMusicVisualizer.loadMusicFromFileNode(d3.select("#File"));
+					tsneMusicVisualizer.loadMusicFromFileNode(d3.select("#File"),getBPM(),getBeatOffset());
 				});
 				
 				d3.select("#UseUrl").on("click",function(){
-					tsneMusicVisualizer.loadMusicFromUrl(d3.select('#Url').attr('value'));
+					tsneMusicVisualizer.loadMusicFromUrl(d3.select('#Url').attr('value'), getBPM(), getBeatOffset());
 				});
 				
 				d3.select("#AnimateStop").on("click",function(){
@@ -67,6 +85,10 @@
 	<input type="button" id="Step" value="Step And Draw" />
 	<input type="button" id="AnimateStop" value="Animate"/>
 	<input type="button" id="RunClearKMeans" value="Run K-Means"/>
+	
+	<br/>
+	<label for="BPM">Beats Per Minute <input type="text" id="BPM" value="91"/></label>
+	<label for="BeatOffset">Beat Offset (seconds) <input type="text" id="BeatOffset" value="0"/></label>
 	
 	</br>
 	<input type="file" id="File" value="Upload File" name="file" />
