@@ -55,16 +55,15 @@ TsneMusicVisualizer.prototype.initializePointCloud = function(pointCloudSvgNode)
 		self._songAmplitudeViz.deHighlightIdx(i);
 	});
 	
-	this._playThroughClusterStopTrigger = {};
-	
 	var playThroughClusterStopTrigger = {};
 
 	this._pointCloud.setToggleClusterCallback(function(clusterIdx,clusterIndices){
 		playThroughClusterStopTrigger[clusterIdx] = false;
 		function timeout(i,lastIdx){
 			self._pointCloud.deHighlightIdx(lastIdx);
+			self._songAmplitudeViz.deHighlightIdx(lastIdx);
 			
-			if(self._playThroughClusterStopTrigger[clusterIdx] === true){
+			if(playThroughClusterStopTrigger[clusterIdx] === true){
 				return;
 			}
 			var chunkIdx = clusterIndices[i];
@@ -72,6 +71,7 @@ TsneMusicVisualizer.prototype.initializePointCloud = function(pointCloudSvgNode)
 			self._playSound(offset);
 			
 			self._pointCloud.highlightIdx(chunkIdx);
+			self._songAmplitudeViz.highlightIdx(chunkIdx);
 			
 			//play the next available chunk
 			i = (i+1) % clusterIndices.length;
@@ -82,7 +82,7 @@ TsneMusicVisualizer.prototype.initializePointCloud = function(pointCloudSvgNode)
 	});
 	
 	this._pointCloud.setDeToggleClusterCallback(function(clusterIdx){
-		self._playThroughClusterStopTrigger[clusterIdx] = true;
+		playThroughClusterStopTrigger[clusterIdx] = true;
 	});
 }
 

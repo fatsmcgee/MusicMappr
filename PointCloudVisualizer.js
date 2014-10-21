@@ -1,5 +1,4 @@
 
-
 function PointCloudVisualizer(svgNode){
 	this._svgNode = d3.select(svgNode);
 	this._kMeansClusters = 26;
@@ -11,8 +10,12 @@ function PointCloudVisualizer(svgNode){
 	var self = this;
 	var keysDown = {};
 	d3.select("body").on("keydown.PointCloud", function(){
-		
 		var clusterIdx = d3.event.keyCode - 65;
+		//only respond to characters a-z
+		if(clusterIdx <0 || clusterIdx > this._kMeansClusters){
+			return;
+		}
+		
 		if(keysDown[clusterIdx]){
 			return;
 		}
@@ -23,6 +26,11 @@ function PointCloudVisualizer(svgNode){
 	d3.select("body").on("keyup.PointCloud", function(){
 		var clusterIdx = d3.event.keyCode - 65;
 		keysDown[clusterIdx] = false;
+		
+		if(clusterIdx <0 || clusterIdx > this._kMeansClusters){
+			return;
+		}
+		
 		self._indicesByCluster && self._deToggleClusterCallback && self._deToggleClusterCallback(clusterIdx);
 	});
 }
@@ -164,7 +172,7 @@ PointCloudVisualizer.prototype.getKMeans = function(){
 	var lineFunction = d3.svg.line()
 		.x(function(p) { return self._scaleX(p.x); })
 		.y(function(p) { return self._scaleY(p.y); })
-		.interpolate("basis-closed");
+		.interpolate("linear-closed");
 		
 	
 	for(var i = 0; i<nClusters; i++){

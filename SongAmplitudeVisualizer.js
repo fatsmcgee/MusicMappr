@@ -1,16 +1,49 @@
-function SongAmplitudeVisualizer(songSvgNode){
+function SongAmplitudeVisualizer(songSvgNode, nBuckets){
 	this._svgNode = d3.select(songSvgNode);
-	this._highlightIdx = null;
+	this._amplitudeHighlightIdx = null;
+	
+	//default number of buckets = 200
+	this._defaultBuckets = nBuckets || 100;
 }
 
 SongAmplitudeVisualizer.prototype.update = function(amplitudes){
+
+	this._nBuckets = this._defaultBuckets;
+	
 	this._amplitudes = amplitudes;
+	//number of buckets cannot be greater than number of amplitudes provided
+	if(this._amplitudes.length <= this._nBuckets){
+		this._nBuckets = this._amplitudes.length;
+	}
+	
+	this._buckets = [];
+	var amplitudesPerBucket = amplitudes.length/this._nBuckets;
+	
+	for(var i = 0; i<this._nBuckets; i++){
+		//sum the total amplitude for this bucket. d3 will normalize so we don't need to
+		var bucketAmplitude = 0;
+		for(var j = ~~(i*amplitudesPerBucket); j<~~((i+1)*amplitudesPerBucket); j++){
+			bucketAmplitude += this._amplitudes[j];
+		}
+		this._buckets[i] = bucketAmplitude;
+	}
 }
 
+SongAmplitudeVisualizer.prototype._bucketFromAmplitudeIndex = function(idx){
+	var nAmplitudes = this._amplitudes.length;
+	return ~~((idx/nAmplitudes)*this._nBuckets);
+}
 
-//returns function which takes a given index in the amplitudes, and returns its x position on the bar chart
-SongAmplitudeVisualizer.prototype._getIndexScaler = function(){
-	return d3.scale.linear().domain([0, this._amplitudes.length]).range([0,this._svgNode.attr("width")]);
+//returns function which takes a given index in the buckets, and returns its x position on the bar chart
+SongAmplitudeVisualizer.prototype._getIndexScaler = function(numIndices){
+	return d3.scale.linear().domain([0, numIndices]).range([0,this._svgNode.attr("width")]);
+}
+
+//given x position in the SVG node, returns the corresponding amplitude index
+SongAmplitudeVisualizer.prototype._getAmplitudeIdxFromX = function(x){
+	var width = this._svgNode.attr("width");
+	var scale =  d3.scale.linear().domain([0, width]).range([0,this._amplitudes.length]);
+	return ~~scale(x);
 }
 
 SongAmplitudeVisualizer.prototype.render = function(){
@@ -19,55 +52,61 @@ SongAmplitudeVisualizer.prototype.render = function(){
 	
 	var amplitudes = this._amplitudes;
 	var nAmplitudes = amplitudes.length;
+	var nBuckets = this._nBuckets;
+	var buckets = this._buckets;
 	
 	var width = this._svgNode.attr("width");
 	var height = this._svgNode.attr("height");
 	
 	rects = this._svgNode.selectAll("rect .chunks");
-	if(amplitudes.length != rects.size()){
+	if(nBuckets != rects.size()){
 		rects
-			.data(amplitudes)
+			.data(buckets)
 			.enter()
 			.append("rect")
 			.attr("class","chunk");
 	}
 	
 	//Scale the points to their extent
-	var maxAmplitude = d3.max(amplitudes);
-	var minAmplitude = d3.min(amplitudes);
+	var maxBucket = d3.max(buckets);
+	var minBucket = d3.min(buckets);
 	
 	//Give a margin of 10 from the top and the right
-	var scaleAmplitude = d3.scale.linear().domain([minAmplitude, maxAmplitude]).range([0,height-10]);
-	var scaleIndex = this._getIndexScaler(); 
+	var scaleAmplitude = d3.scale.linear().domain([minBucket, maxBucket]).range([0,height-10]);
+	var scaleIndex = this._getIndexScaler(nBuckets); 
 	
 	this._svgNode.selectAll("rect.chunk")
-		.data(amplitudes)
-		.attr("x",function(amplitude,i){ return scaleIndex(i);}) 
-		.attr("y", function(amplitude){return height - scaleAmplitude(amplitude);}) 
-		.attr("width", function(amplitude){
+		.data(buckets)
+		.attr("x",function(bucket,i){ return scaleIndex(i);}) 
+		.attr("y", function(bucket){return height - scaleAmplitude(bucket);}) 
+		.attr("width", function(bucket){
 			return scaleIndex(1); //width is full length of a bucket minus margin of 1
 		})
-		.attr("height", function(amplitude){
-			return scaleAmplitude(amplitude);
+		.attr("height", function(bucket){
+			return scaleAmplitude(bucket);
 		})
-		.style("fill",function(amplitude,i){return self._coloringFunction(i,nAmplitudes);})
-		.on("mouseover.plugin",function(amplitude,i){
-			self._mouseoverPointFunction(i,nAmplitudes);
+		.style("fill",function(bucket,i){return self._coloringFunction(i,nBuckets);})
+		.on("mousemove.plugin",function(bucket,i){
+			var mouseX = d3.mouse(self._svgNode.node())[0];
+			var amplitudeIdx =  self._getAmplitudeIdxFromX(mouseX);
+			self._mouseoverPointFunction(amplitudeIdx,nAmplitudes);
 		})
-		.on("mouseover.highlight",function(amplitude,i){
-			self.highlightIdx(i);
+		.on("mousemove.highlight",function(bucket,bucketIdx){
+			var mouseX = d3.mouse(self._svgNode.node())[0];
+			var amplitudeIdx =  self._getAmplitudeIdxFromX(mouseX);
+			self.highlightIdx(amplitudeIdx,mouseX);
 			if(self._highlightedCallback){
-				self._highlightedCallback(i);
+				self._highlightedCallback(amplitudeIdx);
 			}
 		});
 		
 }
 
 SongAmplitudeVisualizer.prototype._removeHighlight = function(){
-	var prevHighlight = this._svgNode.select("rect.highlight._" + this._highlightIdx);
+	var prevHighlight = this._svgNode.select("rect.highlight._" + this._amplitudeHighlightIdx);
 	if(prevHighlight.size()){
 		prevHighlight.remove();
-		this._deHighlightedCallback && this._deHighlightedCallback(this._highlightIdx);
+		this._deHighlightedCallback && this._deHighlightedCallback(this._amplitudeHighlightIdx);
 	}
 }
 
@@ -76,26 +115,33 @@ SongAmplitudeVisualizer.prototype.deHighlightIdx = function(idx){
 	this._svgNode.select("rect.highlight._" + idx).remove();
 }
 
-SongAmplitudeVisualizer.prototype.highlightIdx = function(idx){
+//highlight the specified amplitudeIdx. If x is not given calculates x
+SongAmplitudeVisualizer.prototype.highlightIdx = function(amplitudeIdx,x){
 	
 	var self = this;
 	
 	this._removeHighlight();
-	this._highlightIdx = idx;
+	this._amplitudeHighlightIdx = amplitudeIdx;
 	
-	var idxToX = this._getIndexScaler();
-	var width = idxToX(1);
+	var nAmplitudes = this._amplitudes.length;
+	var idxToX = this._getIndexScaler(nAmplitudes);
+	var x = x || idxToX(amplitudeIdx);
+	console.log(x);
+	
+	var svgWidth = this._svgNode.attr("width");
+	var width = ~~(svgWidth/nAmplitudes);
+	
 	this._svgNode.append("rect")
-	.attr("class","highlight _" + idx)
-	.attr("x",idxToX(idx))
+	.attr("class","highlight _" + amplitudeIdx)
+	.attr("x",x)
 	.attr("y",0)
 	.attr("height", this._svgNode.attr("height"))
 	.attr("width",width)
 	.attr("fill",d3.rgb(255,0,0))
 	.attr("fill-opacity",.5)
 	.on("mouseout.highlight",function(){
-			self.deHighlightIdx(idx);
-			self._deHighlightedCallback && self._deHighlightedCallback(idx);
+			self.deHighlightIdx(amplitudeIdx);
+			self._deHighlightedCallback && self._deHighlightedCallback(amplitudeIdx);
 	});
 }
 
