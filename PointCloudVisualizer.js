@@ -45,6 +45,11 @@ PointCloudVisualizer.prototype.updateAndDraw = function(points){
 	this.draw();
 }
 
+PointCloudVisualizer.prototype._removeKMeansGraphics = function(){
+	//eliminate the k-means graphics
+	this._svgNode.selectAll(".kmeans").remove();
+}
+
 PointCloudVisualizer.prototype.draw = function(){
 	
 	var self = this;
@@ -53,15 +58,15 @@ PointCloudVisualizer.prototype.draw = function(){
 	
 	var points = this._points;
 	
-	//eliminate the k-means graphics
-	this._svgNode.selectAll("path").remove();
+	this._removeKMeansGraphics();
 	
-	var circles = this._svgNode.selectAll("circle");
+	var circles = this._svgNode.selectAll("circle.point");
 	if(points.length != circles.size()){
 		circles
 			.data(points)
 			.enter()
-			.append("circle");
+			.append("circle")
+			.attr("class","point");
 	}
 	
 	//Scale the points to their extent
@@ -73,9 +78,9 @@ PointCloudVisualizer.prototype.draw = function(){
 	var scaleX = this._scaleX = d3.scale.linear().domain([YxExtent[0], YxExtent[1]]).range([screenMargin,width-screenMargin]);
 	var scaleY = this._scaleY =  d3.scale.linear().domain([YyExtent[0], YyExtent[1]]).range([screenMargin,height-screenMargin]);
 	
-	d3.select("svg").selectAll("circle")
+	this._svgNode.selectAll("circle.point")
 		.data(points)
-		.attr("class",function(p,i){return "_" + i;}) //give each point its own class based on index
+		.attr("class",function(p,i){return "point " + "_" + i;}) //give each point its own class based on index
 		.attr("cx",function(p){ return scaleX(p[0]);}) 
 		.attr("cy", function(p){return scaleY(p[1]);}) 
 		.attr("r",3)
@@ -138,6 +143,8 @@ PointCloudVisualizer.prototype.deHighlightIdx = function(idx){
 
 PointCloudVisualizer.prototype.getKMeans = function(){
 
+	this._removeKMeansGraphics();
+	
 	var self = this;
 	var nClusters = this._kMeansClusters;
 	var kmeans = figue.kmeans(nClusters,this._points);
@@ -176,13 +183,36 @@ PointCloudVisualizer.prototype.getKMeans = function(){
 		
 	
 	for(var i = 0; i<nClusters; i++){
-	
+		var hull = convexHullByCluster[i];
+		var xCenter = d3.sum(hull, function(p){return self._scaleX(p.x)});
+		var yCenter = d3.sum(hull, function(p){return self._scaleY(p.y)});
+		xCenter/= hull.length;
+		yCenter/= hull.length;
+		
 		var lineGraph = this._svgNode.append("path")
-			//.attr("d", lineFunction(convexHullByCluster[i]))
-			.attr("d", lineFunction.tension(.7)(convexHullByCluster[i]))
+			.attr("d", lineFunction.tension(.7)(hull))
 			.attr("stroke", "blue")
 			.attr("stroke-width", 2)
-			.attr("fill", "none");
+			.attr("fill", "none")
+			.attr("class","kmeans");
+			
+		var node = this._svgNode.append("g")
+			.attr("transform", "translate(" + xCenter + "," + yCenter + ")")
+			.attr("class","kmeans");
+			
+		var circle = node.append("circle")
+			.attr("r",10)
+			.attr("fill","url(#RadialGradient)");
+		
+		var character = String.fromCharCode(65+i);
+		var text = node.append("text")
+		.attr("x",0)
+		.attr("y",0)
+		.text(character)
+		.style("fill",d3.rgb(255,255,255))
+		.style("font-size",12)
+		.style("text-anchor","middle")
+		.style("dominant-baseline","central");
 	}
 	
 }
