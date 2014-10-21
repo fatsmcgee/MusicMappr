@@ -172,13 +172,14 @@ PointCloudVisualizer.prototype.getKMeans = function(){
 	var lineFunction = d3.svg.line()
 		.x(function(p) { return self._scaleX(p.x); })
 		.y(function(p) { return self._scaleY(p.y); })
-		.interpolate("linear-closed");
+		.interpolate("cardinal-closed");
 		
 	
 	for(var i = 0; i<nClusters; i++){
 	
 		var lineGraph = this._svgNode.append("path")
-			.attr("d", lineFunction(convexHullByCluster[i]))
+			//.attr("d", lineFunction(convexHullByCluster[i]))
+			.attr("d", lineFunction.tension(.7)(convexHullByCluster[i]))
 			.attr("stroke", "blue")
 			.attr("stroke-width", 2)
 			.attr("fill", "none");
