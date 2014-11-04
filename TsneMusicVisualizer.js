@@ -1,5 +1,4 @@
 
-
 function TsneMusicVisualizer(pointCloudSvgNode,songVisualizerSvgNode){
 	this._tsne = new tsnejs.tSNE();
 	var AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -7,8 +6,8 @@ function TsneMusicVisualizer(pointCloudSvgNode,songVisualizerSvgNode){
 	this._animating = false;
 	this._stopAnimatingSwitch = false;
 	
-	//criteria for stopping in terms of T-SNE cost difference
-	this._epsilon = Math.pow(10,-15);
+	this._convergenceCheckInterval = 50;
+	this._convergenceEpsilon = .02;
 	
 	//initialize the point cloud
 	this.initializePointCloud(pointCloudSvgNode);
@@ -22,7 +21,15 @@ function TsneMusicVisualizer(pointCloudSvgNode,songVisualizerSvgNode){
 	
 	//unitialized until TSNE is loaded
 	this._lastCost = null;
+	this._costDiffs = null;
 }
+
+TsneMusicVisualizer.prototype._getMaxIntArray = function(n){
+	return d3.range(n).map(
+		function(i){return Number.MAX_VALUE;}
+		);
+}
+
 
 TsneMusicVisualizer.prototype.initializeSongAmplitudeVisualizer = function(songVisualizerSvgNode){
 	var self = this;
@@ -172,6 +179,9 @@ TsneMusicVisualizer.prototype._updateSongVisualizer = function(){
 TsneMusicVisualizer.prototype._initTsne = function(featureData){
 	this._tsne.initDataRaw(featureData);
 	this._lastCost = Number.MAX_VALUE;
+	this._costDiffs = this._getMaxIntArray(50);
+	this._lastSolutions = [];
+	this._stepNo = 0;
 }
 
 //Return a sample length that is a power of two fraction of the actual beat length
@@ -273,6 +283,31 @@ TsneMusicVisualizer.prototype._getFeaturesFromMusicBufferAsync = function(fftPad
 	}
 }
 
+TsneMusicVisualizer.prototype._haveSolutionsConverged = function(oldPoints,newPoints){
+	
+	var oldXExtent = d3.extent(oldPoints, function(d){return d[0];});
+	var oldYExtent = d3.extent(oldPoints, function(d){return d[1];});
+	var newXExtent = d3.extent(newPoints, function(d){return d[0];});
+	var newYExtent = d3.extent(newPoints, function(d){return d[1];});
+	
+	var scaleOldX = d3.scale.linear().domain([oldXExtent[0], oldXExtent[1]]).range([0,1]);
+	var scaleOldY = d3.scale.linear().domain([oldYExtent[0], oldYExtent[1]]).range([0,1]);
+	
+	var scaleNewX = d3.scale.linear().domain([newXExtent[0], newXExtent[1]]).range([0,1]);
+	var scaleNewY = d3.scale.linear().domain([newYExtent[0], newYExtent[1]]).range([0,1]);
+	
+	var scaledEuclideanDists = d3.range(oldPoints.length).map(function(i){
+		var squaredDist = Math.pow(scaleNewY(newPoints[i][1])-scaleOldY(oldPoints[i][1]),2) + Math.pow(scaleNewX(newPoints[i][0])-scaleOldX(oldPoints[i][0]),2);
+		return Math.sqrt(squaredDist);
+	});
+	
+	var totalScaledEuclideanDist = d3.sum(scaledEuclideanDists);
+	var avgScaledEuclideanDist = totalScaledEuclideanDist/oldPoints.length;
+	console.log("Average scaled euclidean dist: " + avgScaledEuclideanDist);
+	
+	return avgScaledEuclideanDist < this._convergenceEpsilon;
+}
+
 TsneMusicVisualizer.prototype.step = function(steps){
 	var steps = steps || 1;
 	
@@ -284,8 +319,26 @@ TsneMusicVisualizer.prototype.step = function(steps){
 	this._lastCost = cost;
 	
 	var newPoints = this._tsne.getSolution();
+	if(this._stepNo % this._convergenceCheckInterval ==0){
+		if(this._lastSolutions.length == 2){
+			this._lastSolutions.shift();
+		}
+		
+		//tsne.getSolution() returns a reference, so we must clone
+		var pointsClone = newPoints.map(function(pt){return [pt[0],pt[1]];});
+		this._lastSolutions.push(pointsClone);
+		
+		if(this._stepNo >= this._convergenceCheckInterval){
+			if(this._haveSolutionsConverged(this._lastSolutions[0], this._lastSolutions[1])){
+				this.stopAnimate();
+				console.log("Done animating");
+			}
+		}
+	}
+	
 	this._pointCloud.update(newPoints);
 	
+	this._stepNo++;
 	return Math.abs(costDiff);
 }
 
