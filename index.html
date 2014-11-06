@@ -13,37 +13,30 @@
 		
 		<script>
 			
-			function getBPM(){
-				var text = d3.select("#BPM").node().value;
-				var bpm = parseFloat(text);
-				if (!isNaN(bpm)){
-					return bpm;
-				}
-				return undefined;
+			var devMode = false;
+			var tsneMusicVisualizer = null;
+			var loadSongCallback;
+			
+			function onLoadSong(){
+				tsneMusicVisualizer.animate(function(){
+					tsneMusicVisualizer.getKMeans();
+				});
 			}
 			
-			function getBeatOffset(){
-				var text = d3.select("#BeatOffset").node().value;
-				var offset = parseFloat(text);
-				if (!isNaN(offset)){
-					return offset;
+			function toggleDevMode(){
+				devMode = !devMode;
+				if(devMode){
+					d3.selectAll(".DevMode").style("display","");
+					loadSongCallback = function(){};
 				}
-				return undefined;
+				else{
+					d3.selectAll(".DevMode").style("display","none");
+					loadSongCallback = onLoadSong;
+				}
 			}
 			
-			window.addEventListener("load",function(){
-				tsneMusicVisualizer = new TsneMusicVisualizer("#PointsSvg","#SongSvg");
-				var musicUrl = "http://upload.wikimedia.org/wikipedia/en/4/45/ACDC_-_Back_In_Black-sample.ogg";
-				tsneMusicVisualizer.loadMusicFromUrl(musicUrl,getBPM(),getBeatOffset());
-				
-				d3.select("#UseFile").on("click",function(){
-					tsneMusicVisualizer.loadMusicFromFileNode(d3.select("#File"),getBPM(),getBeatOffset());
-				});
-				
-				d3.select("#UseUrl").on("click",function(){
-					tsneMusicVisualizer.loadMusicFromUrl(d3.select('#Url').attr('value'), getBPM(), getBeatOffset());
-				});
-				
+			
+			function setupDevMode(){
 				d3.select("#AnimateStop").on("click",function(){
 					//if we click "Animate", start animation and set label to "Stop"
 					var self = this;
@@ -68,41 +61,95 @@
 				d3.select("#RunClearKMeans").on("click",function(){
 					tsneMusicVisualizer.getKMeans();
 				});
+			}
+			
+			function getBPM(){
+				var text = d3.select("#BPM").node().value;
+				var bpm = parseFloat(text);
+				if (!isNaN(bpm)){
+					return bpm;
+				}
+				return undefined;
+			}
+			
+			
+			window.addEventListener("load",function(){
+			
+				tsneMusicVisualizer = new TsneMusicVisualizer("#PointsSvg","#SongSvg");
+				
+				tsneMusicVisualizer.setLoggerCallback(function(msg){
+					logTa = document.getElementById("Log");
+					logTa.value = logTa.value + msg + "\n";
+				});
+				
+				loadSongCallback = onLoadSong;
+				
+				var musicUrl = "Default.mp3";
+				
+				tsneMusicVisualizer.loadMusicFromUrl(musicUrl,getBPM(),loadSongCallback);
+				
+				d3.select("#UseFile").on("click",function(){
+					tsneMusicVisualizer.loadMusicFromFileNode(d3.select("#File"),getBPM());
+				});
+				
+				d3.select("#UseUrl").on("click",function(){
+					tsneMusicVisualizer.loadMusicFromUrl(d3.select('#Url').attr('value'), getBPM());
+				});
+				
+				d3.select("body").on("keypress.DevMode", function(){
+					if(d3.event.keyCode == 2 && d3.event.ctrlKey){
+						toggleDevMode();
+					}
+				});
+				
+				d3.selectAll(".DevMode").style("display","none");
+				
+				setupDevMode();
 			});
 			
 			
 		</script>
 	</head>
 	<body>
-	<svg id="PointsSvg" width="500" height="500" style="border: 1px solid green">
-		<defs>
-			<radialGradient id="RadialGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-			  <stop offset="0%" style="stop-color:rgb(255,0,0);stop-opacity:.8" />
-			  <stop offset="100%" style="stop-color:rgb(255,0,0);stop-opacity:.2" />
-			</radialGradient>
-		</defs>
-	</svg>
+	<div id = "Visualizations" style="width:1020">
+		<div style="float:left">
+		<svg id="PointsSvg" width="500" height="500" style="border: 1px solid green">
+			<defs>
+				<radialGradient id="RadialGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+				  <stop offset="0%" style="stop-color:rgb(255,0,0);stop-opacity:.8" />
+				  <stop offset="100%" style="stop-color:rgb(255,0,0);stop-opacity:.2" />
+				</radialGradient>
+			</defs>
+		</svg>
+		</div>
+		<div style="float:right">
+			<svg id="SongSvg" width="500" height="200" style="border: 1px solid orange">
+			</svg>
+			</br>
+			
+			<textarea readonly id="Log" style="width:500px; height:295px; resize:none"></textarea>
+		</div>
+	<div>
 	
-	<svg id="SongSvg" width="700" height="200" style="border: 1px solid orange">
-	</svg>
-	
-	</br>
-	<label for="Steps">Steps <input type="text" id="Steps" value="1"/> </label>
-	<input type="button" id="Step" value="Step And Draw" />
-	<input type="button" id="AnimateStop" value="Animate"/>
-	<input type="button" id="RunClearKMeans" value="Run K-Means"/>
-	
-	<br/>
-	<label for="BPM">Beats Per Minute <input type="text" id="BPM" value="91"/></label>
-	<label for="BeatOffset">Beat Offset (seconds) <input type="text" id="BeatOffset" value="0"/></label>
-	
-	</br>
-	<input type="file" id="File" value="Upload File" name="file" />
-	<input type="button" id="UseFile" value="Use This File"/>
-	
-	</br>
-	<input type="text" id="Url" value="http://upload.wikimedia.org/wikipedia/commons/1/1b/The_Entertainer_-_Scott_Joplin.ogg"/>
-	<input type="button" id="UseUrl" value="Use This Url" />
-
+	<div id = "Inputs" style="clear:both">
+		<div class="DevMode">
+			<label for="Steps">Steps <input type="text" id="Steps" value="1"/> </label>
+			<input type="button" id="Step" value="Step And Draw" />
+			<input type="button" id="AnimateStop" value="Animate"/>
+			<input type="button" id="RunClearKMeans" value="Run K-Means"/>
+		</div>
+		
+		<div class="DevMode">
+			<label for="BPM">Beats Per Minute <input type="text" id="BPM" value=""/></label>
+		</div>
+		
+		</br>
+		<input type="file" id="File" value="Upload File" name="file" />
+		<input type="button" id="UseFile" value="Use This File"/>
+		
+		</br>
+		<input type="text" id="Url" value="http://upload.wikimedia.org/wikipedia/commons/1/1b/The_Entertainer_-_Scott_Joplin.ogg"/>
+		<input type="button" id="UseUrl" value="Use This Url" />
+	</div>
 	</body>
 </html>

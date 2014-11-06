@@ -22,6 +22,20 @@ function TsneMusicVisualizer(pointCloudSvgNode,songVisualizerSvgNode){
 	//unitialized until TSNE is loaded
 	this._lastCost = null;
 	this._costDiffs = null;
+	
+	//does nothing until explicity set elsewhere
+	this._loggerCallback = function(msg){};
+	
+	//initialize work ID so that song loading can be overridden
+	this._nextWorkId = 0;
+	//if song is loaded while a song is already loading, specifies work ID to kill
+	this._workIdsToKill = {};
+	
+}
+
+//Takes a function(string), where a string is a messaged to be logged from TsneMusicVisualizer
+TsneMusicVisualizer.prototype.setLoggerCallback = function(logger){
+	this._loggerCallback = logger;
 }
 
 TsneMusicVisualizer.prototype._getMaxIntArray = function(n){
@@ -115,8 +129,10 @@ TsneMusicVisualizer.prototype._playSound = function(offset){
 }
 
 			
-TsneMusicVisualizer.prototype.loadMusicFromUrl = function(musicUrl,bpm,beatOffset){
+TsneMusicVisualizer.prototype.loadMusicFromUrl = function(musicUrl,bpm,onFinish){
 	musicUrl = musicUrl;
+	
+	this._loggerCallback("Loading song from URL " + musicUrl + "...");
 	
 	var request = new XMLHttpRequest();
 	
@@ -125,27 +141,32 @@ TsneMusicVisualizer.prototype.loadMusicFromUrl = function(musicUrl,bpm,beatOffse
 	
 	var self = this;
 	request.onload = function(){
-		self._loadMusicFromBuffer(request.response,bpm,beatOffset);
+	
+		self._loggerCallback("Song loaded.");
+		self._loadMusicFromBuffer(request.response,bpm,onFinish);
 	}
 	
 	request.send();
 }
 
-TsneMusicVisualizer.prototype.loadMusicFromFileNode = function(fileNode, bpm, beatOffset){
+TsneMusicVisualizer.prototype.loadMusicFromFileNode = function(fileNode, bpm,onFinish){
 	var files = fileNode.node().files;
 	if (!files.length) {
 	  alert('Please select a file!');
 	  return;
 	}
 
-	var file = files[0];
+	file = files[0];
 
 	var reader = new FileReader();
+	
+	this._loggerCallback("Loading song from file " + file.name) + "...";
 
 	var self = this;
 	reader.onloadend = function(evt) {
+		self._loggerCallback("File loaded");
 	  if (evt.target.readyState == FileReader.DONE) { // DONE == 2
-		self._loadMusicFromBuffer(reader.result, bpm,beatOffset);
+		self._loadMusicFromBuffer(reader.result, bpm,onFinish);
 		
 	  }
 	};
@@ -196,10 +217,15 @@ TsneMusicVisualizer.prototype._getSampleLengthFromBpm = function(sampleRate,bpm,
 	return samplesPerBeat;
 }
 
-TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer, bpm,beatOffset){
+TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer, bpm, onFinish){
 
 	var self = this;
+	this._loggerCallback("Decoding audio data...");
+	
 	this._audioContext.decodeAudioData(arrayBuffer, function(audioBuffer){
+	
+		self._loggerCallback("Audio data decoded");
+		
 		self._musicBuffer = audioBuffer;
 		
 		var fftInputSize = 16384;
@@ -219,11 +245,16 @@ TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer, bpm,b
 		self._bufferData = audioBuffer.getChannelData(0);
 
 		var start = new Date();
+		
+		self._loggerCallback("Extracting features from audio data...");
 		self._getFeaturesFromMusicBufferAsync(fftPadding,function(spectogramData){
+			self._loggerCallback("Features extracted");
 			var duration = ((new Date())-start)/1000;
 			console.log("Features took " + duration + " seconds to compute");
 			self._initTsne(spectogramData);
 			self.stepAndDraw();
+			
+			onFinish && onFinish();
 		});
 		
 		self._updateSongVisualizer();
@@ -347,9 +378,8 @@ TsneMusicVisualizer.prototype.draw = function(){
 }
 
 TsneMusicVisualizer.prototype.stepAndDraw = function(){
-	var costDiff = this.step();
+	this.step();
 	this.draw();
-	return costDiff;
 }
 
 
@@ -357,16 +387,23 @@ TsneMusicVisualizer.prototype.stopAnimate = function(){
 	this._stopAnimatingSwitch = true;
 }
 
-TsneMusicVisualizer.prototype.animate = function(stopContinuation){
-	var costDiff = this.stepAndDraw(1);
-	if((costDiff < this._epsilon) || this._stopAnimatingSwitch){
+TsneMusicVisualizer.prototype.animate = function(stopContinuation,notFirstIteration){
+
+	if(!notFirstIteration){
+		this._loggerCallback("Optimizing soundscape...");
+	}
+	
+	this.stepAndDraw();
+	if(this._stopAnimatingSwitch){
+		this._loggerCallback("Soundscape optimized.");
+		this._loggerCallback("Ready to go! Hold down keyboard keys to play through clusters. Hover over dots to play corresponding sample.");
 		this._animating =false;
 		this._stopAnimatingSwitch = false;
 		stopContinuation && stopContinuation();
 		return;
 	}
 	this._animating = true;
-	requestAnimationFrame(this.animate.bind(this,stopContinuation));
+	requestAnimationFrame(this.animate.bind(this,stopContinuation,true));
 	
 }
 
