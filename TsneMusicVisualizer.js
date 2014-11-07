@@ -396,7 +396,8 @@ TsneMusicVisualizer.prototype.animate = function(stopContinuation,notFirstIterat
 	this.stepAndDraw();
 	if(this._stopAnimatingSwitch){
 		this._loggerCallback("Soundscape optimized.");
-		this._loggerCallback("Ready to go! Hold down keyboard keys to play through clusters. Hover over dots to play corresponding sample.");
+		this._loggerCallback("Ready to go! Hold down keyboard keys A-Z to play through clusters. Hover over dots to play corresponding song sample. Hover over bars to play that part of the song.");
+		this._loggerCallback("You can also load your own song from a file or URL.");
 		this._animating =false;
 		this._stopAnimatingSwitch = false;
 		stopContinuation && stopContinuation();

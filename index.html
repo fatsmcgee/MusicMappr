@@ -10,6 +10,8 @@
 		<script src="TsneMusicVisualizer.js"></script>
 		<script src="figue.js"></script>
 		<script src="graham_scan.js"></script>
+		<script src="radixsort.js"></script>
+		<script src="BeatDetector.js"></script>
 		
 		<script>
 			
@@ -89,11 +91,11 @@
 				tsneMusicVisualizer.loadMusicFromUrl(musicUrl,getBPM(),loadSongCallback);
 				
 				d3.select("#UseFile").on("click",function(){
-					tsneMusicVisualizer.loadMusicFromFileNode(d3.select("#File"),getBPM());
+					tsneMusicVisualizer.loadMusicFromFileNode(d3.select("#File"),getBPM(),loadSongCallback);
 				});
 				
 				d3.select("#UseUrl").on("click",function(){
-					tsneMusicVisualizer.loadMusicFromUrl(d3.select('#Url').attr('value'), getBPM());
+					tsneMusicVisualizer.loadMusicFromUrl(d3.select('#Url').attr('value'), getBPM(),loadSongCallback);
 				});
 				
 				d3.select("body").on("keypress.DevMode", function(){
@@ -145,7 +147,7 @@
 		
 		</br>
 		<input type="file" id="File" value="Upload File" name="file" />
-		<input type="button" id="UseFile" value="Use This File"/>
+		<input type="button" id="UseFile" value="Use This File File"/>
 		
 		</br>
 		<input type="text" id="Url" value="http://upload.wikimedia.org/wikipedia/commons/1/1b/The_Entertainer_-_Scott_Joplin.ogg"/>
