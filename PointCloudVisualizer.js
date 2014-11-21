@@ -137,7 +137,7 @@ PointCloudVisualizer.prototype.deHighlightIdx = function(idx){
 	var numPoints = this._points.length;
 	var self = this;
 	this._svgNode.select("circle._" + idx)
-		.style("fill",function(point,i){return self._coloringFunction(i,numPoints);})
+		.style("fill",function(point,i){return self._coloringFunction(idx,numPoints);})
 		.attr("r",3);
 }
 
