@@ -1,5 +1,5 @@
 
-function TsneMusicVisualizer(pointCloudSvgNode,songVisualizerSvgNode){
+function TsneMusicVisualizer(pointCloudSvgNode,songVisualizerSvgNode,audioNode){
 	this._tsne = new tsnejs.tSNE();
 	var AudioContext = window.AudioContext || window.webkitAudioContext;
 	this._audioContext = new AudioContext();
@@ -12,6 +12,31 @@ function TsneMusicVisualizer(pointCloudSvgNode,songVisualizerSvgNode){
 	//initialize the point cloud
 	this.initializePointCloud(pointCloudSvgNode);
 	this.initializeSongAmplitudeVisualizer(songVisualizerSvgNode);
+	this._audioNode = d3.select(audioNode).node();
+	
+	var self = this;
+	this._audioNode.onplay = function(){
+		
+		function timeout(lastIdx){
+			
+			if(lastIdx){
+				self._pointCloud.deHighlightIdx(lastIdx);
+				self._songAmplitudeViz.deHighlightIdx(lastIdx);
+			}
+			
+			if(self._audioNode.paused){
+				return;
+			}
+			
+			var currentTime = self._audioNode.currentTime;
+			var chunkIdx = ~~(currentTime/self._chunkDuration);
+			self._pointCloud.highlightIdx(chunkIdx);
+			self._songAmplitudeViz.highlightIdx(chunkIdx);
+			setTimeout(timeout.bind(self,chunkIdx),self._chunkDuration*1000);
+		}
+		
+		timeout();
+	}
 	
 	
 	//following variables unitialized until music is loaded
@@ -43,7 +68,6 @@ TsneMusicVisualizer.prototype._getMaxIntArray = function(n){
 		function(i){return Number.MAX_VALUE;}
 		);
 }
-
 
 TsneMusicVisualizer.prototype.initializeSongAmplitudeVisualizer = function(songVisualizerSvgNode){
 	var self = this;
@@ -130,8 +154,8 @@ TsneMusicVisualizer.prototype._playSound = function(offset){
 
 			
 TsneMusicVisualizer.prototype.loadMusicFromUrl = function(musicUrl,bpm,onFinish){
-	musicUrl = musicUrl;
 	
+	//this._audioNode.src = musicUrl;
 	this._loggerCallback("Loading song from URL " + musicUrl + "...");
 	
 	var request = new XMLHttpRequest();

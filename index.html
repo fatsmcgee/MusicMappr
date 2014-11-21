@@ -85,7 +85,7 @@
 			
 			window.addEventListener("load",function(){
 			
-				tsneMusicVisualizer = new TsneMusicVisualizer("#PointsSvg","#SongSvg");
+				tsneMusicVisualizer = new TsneMusicVisualizer("#PointsSvg","#SongSvg","#Audio");
 				
 				tsneMusicVisualizer.setLoggerCallback(function(msg){
 					logTa = document.getElementById("Log");
@@ -139,7 +139,7 @@
 			
 			<textarea readonly id="Log" style="width:500px; height:295px; resize:none"></textarea>
 		</div>
-	<div>
+	</div>
 	
 	<div id = "Inputs" style="clear:both">
 		<div class="DevMode">
@@ -153,9 +153,12 @@
 			<label for="BPM">Beats Per Minute <input type="text" id="BPM" value=""/></label>
 		</div>
 		
+		<br/>
+		<audio id="Audio" controls="controls"></audio>
+		
 		</br>
 		<input type="file" id="File" value="Upload File" name="file" />
-		<input type="button" id="UseFile" value="Use This File File"/>
+		<input type="button" id="UseFile" value="Use This File"/>
 		
 		</br>
 		<input type="text" id="Url" value="http://upload.wikimedia.org/wikipedia/commons/1/1b/The_Entertainer_-_Scott_Joplin.ogg"/>
