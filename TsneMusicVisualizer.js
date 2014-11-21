@@ -3,7 +3,6 @@ function TsneMusicVisualizer(pointCloudSvgNode,songVisualizerSvgNode,audioNode){
 	this._tsne = new tsnejs.tSNE();
 	var AudioContext = window.AudioContext || window.webkitAudioContext;
 	this._audioContext = new AudioContext();
-	this._animating = false;
 	this._stopAnimatingSwitch = false;
 	
 	this._convergenceCheckInterval = 50;
@@ -52,9 +51,7 @@ function TsneMusicVisualizer(pointCloudSvgNode,songVisualizerSvgNode,audioNode){
 	this._loggerCallback = function(msg){};
 	
 	//initialize work ID so that song loading can be overridden
-	this._nextWorkId = 0;
-	//if song is loaded while a song is already loading, specifies work ID to kill
-	this._workIdsToKill = {};
+	this._workId = 0;
 	
 }
 
@@ -155,7 +152,6 @@ TsneMusicVisualizer.prototype._playSound = function(offset){
 			
 TsneMusicVisualizer.prototype.loadMusicFromUrl = function(musicUrl,bpm,onFinish){
 	
-	//this._audioNode.src = musicUrl;
 	this._loggerCallback("Loading song from URL " + musicUrl + "...");
 	
 	var request = new XMLHttpRequest();
@@ -168,6 +164,7 @@ TsneMusicVisualizer.prototype.loadMusicFromUrl = function(musicUrl,bpm,onFinish)
 	
 		self._loggerCallback("Song loaded.");
 		self._loadMusicFromBuffer(request.response,bpm,onFinish);
+		self._audioNode.src = musicUrl;
 	}
 	
 	request.send();
@@ -192,6 +189,10 @@ TsneMusicVisualizer.prototype.loadMusicFromFileNode = function(fileNode, bpm,onF
 	  if (evt.target.readyState == FileReader.DONE) { // DONE == 2
 		self._loadMusicFromBuffer(reader.result, bpm,onFinish);
 		
+		var createObjectUrl = webkitURL.createObjectURL || Url.createObjectURL;
+		var blob = new Blob([reader.result], {type: "audio/mpeg"});
+		url = createObjectUrl(blob);
+		self._audioNode.src = url;
 	  }
 	};
 	reader.readAsArrayBuffer(file);
@@ -244,6 +245,8 @@ TsneMusicVisualizer.prototype._getSampleLengthFromBpm = function(sampleRate,bpm,
 TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer, bpm, onFinish){
 
 	var self = this;
+	
+	var workId = ++self._workId;
 	this._loggerCallback("Decoding audio data...");
 	
 	this._audioContext.decodeAudioData(arrayBuffer, function(audioBuffer){
@@ -271,14 +274,16 @@ TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer, bpm, 
 		var start = new Date();
 		
 		self._loggerCallback("Extracting features from audio data...");
-		self._getFeaturesFromMusicBufferAsync(fftPadding,function(spectogramData){
+		self._getFeaturesFromMusicBufferAsync(workId,fftPadding,function(spectogramData){
 			self._loggerCallback("Features extracted");
 			var duration = ((new Date())-start)/1000;
 			console.log("Features took " + duration + " seconds to compute");
 			self._initTsne(spectogramData);
 			self.stepAndDraw();
 			
-			onFinish && onFinish();
+			if(workId == self._workId){
+				onFinish && onFinish();
+			}
 		});
 		
 		self._updateSongVisualizer();
@@ -289,7 +294,7 @@ TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer, bpm, 
 //continuation(dataArray) should be a function that takes dataArray, an array of feature arrays,
 //and performs some action on them when ready
 //TODO: instead of chunk padding, make into a more general feature extraction parameter object?
-TsneMusicVisualizer.prototype._getFeaturesFromMusicBufferAsync = function(fftPadding,continuation){
+TsneMusicVisualizer.prototype._getFeaturesFromMusicBufferAsync = function(workId,fftPadding,continuation){
 	
 	var chunkLength = this._chunkLength;
 	var bufferData = this._bufferData;
@@ -302,10 +307,19 @@ TsneMusicVisualizer.prototype._getFeaturesFromMusicBufferAsync = function(fftPad
 	var numWorkers = 4;
 	var fftWorkers = [];
 	
+	var self = this;
+	
 	//event responding to a worker finishing its work and giving us output
 	//when all chunks have been processed we're done
 	function onWorkerMessage(evt){
 
+		if(workId != self._workId){
+			for(var i = 0; i<numWorkers; i++){
+				fftWorkers[i].terminate();
+			}
+			return;
+		}
+		
 		var output = evt.data;
 		datas[output.chunkNo] = output.features;  
 		if(++processedChunks == nChunks){
@@ -422,12 +436,10 @@ TsneMusicVisualizer.prototype.animate = function(stopContinuation,notFirstIterat
 		this._loggerCallback("Soundscape optimized.");
 		this._loggerCallback("Ready to go! Hold down keyboard keys A-Z to play through clusters. Hover over dots to play corresponding song sample. Hover over bars to play that part of the song.");
 		this._loggerCallback("You can also load your own song from a file or URL.");
-		this._animating =false;
 		this._stopAnimatingSwitch = false;
 		stopContinuation && stopContinuation();
 		return;
 	}
-	this._animating = true;
 	requestAnimationFrame(this.animate.bind(this,stopContinuation,true));
 	
 }
