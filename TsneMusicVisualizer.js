@@ -150,11 +150,11 @@ TsneMusicVisualizer.prototype._playSound = function(offset){
 }
 
 			
-TsneMusicVisualizer.prototype.loadMusicFromUrl = function(musicUrl,bpm,onFinish){
+TsneMusicVisualizer.prototype.loadMusicFromUrl = function(musicUrl,onFinish){
 	
 	this._loggerCallback("Loading song from URL " + musicUrl + "...");
 	
-	var request = new XMLHttpRequest();
+	request = new XMLHttpRequest();
 	
 	request.open('GET', musicUrl,true);
 	request.responseType = 'arraybuffer';
@@ -163,14 +163,14 @@ TsneMusicVisualizer.prototype.loadMusicFromUrl = function(musicUrl,bpm,onFinish)
 	request.onload = function(){
 	
 		self._loggerCallback("Song loaded.");
-		self._loadMusicFromBuffer(request.response,bpm,onFinish);
+		self._loadMusicFromBuffer(request.response,onFinish);
 		self._audioNode.src = musicUrl;
 	}
 	
 	request.send();
 }
 
-TsneMusicVisualizer.prototype.loadMusicFromFileNode = function(fileNode, bpm,onFinish){
+TsneMusicVisualizer.prototype.loadMusicFromFileNode = function(fileNode,onFinish){
 	var files = fileNode.node().files;
 	if (!files.length) {
 	  alert('Please select a file!');
@@ -187,7 +187,7 @@ TsneMusicVisualizer.prototype.loadMusicFromFileNode = function(fileNode, bpm,onF
 	reader.onloadend = function(evt) {
 		self._loggerCallback("File loaded");
 	  if (evt.target.readyState == FileReader.DONE) { // DONE == 2
-		self._loadMusicFromBuffer(reader.result, bpm,onFinish);
+		self._loadMusicFromBuffer(reader.result,onFinish);
 		
 		var createObjectUrl = webkitURL.createObjectURL || Url.createObjectURL;
 		var blob = new Blob([reader.result], {type: "audio/mpeg"});
@@ -242,7 +242,7 @@ TsneMusicVisualizer.prototype._getSampleLengthFromBpm = function(sampleRate,bpm,
 	return samplesPerBeat;
 }
 
-TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer, bpm, onFinish){
+TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer, onFinish){
 
 	var self = this;
 	
@@ -257,14 +257,10 @@ TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer, bpm, 
 		
 		var fftInputSize = 16384;
 		
-		if(bpm === undefined){
-			self._chunkLength = fftInputSize;
-			console.log("Not using bpm");
-		}
-		else{
-			self._chunkLength = self._getSampleLengthFromBpm(audioBuffer.sampleRate, bpm, fftInputSize);
-			console.log("Using bpm with chunk length = " + self._chunkLength);
-		}
+
+		self._chunkLength = fftInputSize;
+		console.log("Not using bpm");
+		
 		
 		var fftPadding = fftInputSize - self._chunkLength;
 		

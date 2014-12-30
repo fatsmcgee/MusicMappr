@@ -12,6 +12,8 @@
 		<script src="graham_scan.js"></script>
 		<script src="radixsort.js"></script>
 		<script src="BeatDetector.js"></script>
+		<script src="http://ajax.googleapis.com/ajax/libs/jquery/2.0.2/jquery.min.js"></script>
+		<script src="http://connect.soundcloud.com/sdk.js"></script>
 		
 		<script>
 			
@@ -82,8 +84,12 @@
 				return undefined;
 			}
 			
+			function loadSoundcloudUrl(){
+			
+			}
 			
 			window.addEventListener("load",function(){
+			
 			
 				tsneMusicVisualizer = new TsneMusicVisualizer("#PointsSvg","#SongSvg","#Audio");
 				
@@ -94,9 +100,9 @@
 				
 				loadSongCallback = onLoadSong;
 				
-				var musicUrl = "Default.mp3";
+				//var musicUrl = "Default.mp3";
 				
-				tsneMusicVisualizer.loadMusicFromUrl(musicUrl,getBPM(),loadSongCallback);
+				//tsneMusicVisualizer.loadMusicFromUrl(musicUrl,getBPM(),loadSongCallback);
 				
 				d3.select("#UseFile").on("click",function(){
 					tsneMusicVisualizer.loadMusicFromFileNode(d3.select("#File"),getBPM(),loadSongCallback);
@@ -104,8 +110,24 @@
 				});
 				
 				d3.select("#UseUrl").on("click",function(){
-					tsneMusicVisualizer.loadMusicFromUrl(d3.select('#Url').attr('value'), getBPM(),loadSongCallback);
+					
 					document.getElementById("Log").value = "";
+				});
+				
+				d3.select("#UseSoundcloudUrl").on("click",function(){
+					SC.initialize({
+					client_id: clientId,
+					redirect_uri: "http://example.com/callback.html"
+				  });
+			  
+				  var clientId = "8ca2762e1ed85195aa49096d349eade0";
+				  var scUrl = d3.select('#Url').attr('value');
+
+				  $.get('http://api.soundcloud.com/resolve.json?url=' + scUrl + '&client_id=' + clientId, function (result) {
+					  console.log(result);
+					  tsneMusicVisualizer.loadMusicFromUrl(result.stream_url + "?client_id=" + clientId, getBPM(),loadSongCallback);
+				  });
+				
 				});
 				
 				d3.select("body").on("keypress.DevMode", function(){
@@ -117,6 +139,7 @@
 				d3.selectAll(".DevMode").style("display","none");
 				
 				setupDevMode();
+			
 			});
 			
 			
@@ -163,8 +186,10 @@
 		<input type="button" id="UseFile" value="Use This File"/>
 		
 		</br>
-		<input type="text" id="Url" value="http://upload.wikimedia.org/wikipedia/commons/1/1b/The_Entertainer_-_Scott_Joplin.ogg"/>
-		<input type="button" id="UseUrl" value="Use This Url" />
+		<!-- <input type="text" id="Url" value="http://upload.wikimedia.org/wikipedia/commons/1/1b/The_Entertainer_-_Scott_Joplin.ogg"/> -->
+		<input type="text" id="Url" value="https://soundcloud.com/flyinglotus/an-xbox-killed-my-dog"/> 
+		<input type="button" id="UseUrl" value="Use File Url" />
+		<input type="button" id="UseSoundcloudUrl" value="Use Soundcloud Url" />
 	</div>
 	</body>
 </html>
