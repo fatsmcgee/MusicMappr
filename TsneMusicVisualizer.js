@@ -259,7 +259,10 @@ TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer, onFin
 		
 
 		self._chunkLength = fftInputSize;
+<<<<<<< HEAD
 		console.log("Not using bpm");
+=======
+>>>>>>> origin/master
 		
 		
 		var fftPadding = fftInputSize - self._chunkLength;

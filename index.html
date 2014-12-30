@@ -105,7 +105,7 @@
 				//tsneMusicVisualizer.loadMusicFromUrl(musicUrl,getBPM(),loadSongCallback);
 				
 				d3.select("#UseFile").on("click",function(){
-					tsneMusicVisualizer.loadMusicFromFileNode(d3.select("#File"),getBPM(),loadSongCallback);
+					tsneMusicVisualizer.loadMusicFromFileNode(d3.select("#File"),loadSongCallback);
 					document.getElementById("Log").value = "";
 				});
 				
@@ -121,11 +121,19 @@
 				  });
 			  
 				  var clientId = "8ca2762e1ed85195aa49096d349eade0";
+<<<<<<< HEAD
 				  var scUrl = d3.select('#Url').attr('value');
 
 				  $.get('http://api.soundcloud.com/resolve.json?url=' + scUrl + '&client_id=' + clientId, function (result) {
 					  console.log(result);
 					  tsneMusicVisualizer.loadMusicFromUrl(result.stream_url + "?client_id=" + clientId, getBPM(),loadSongCallback);
+=======
+				  var scUrl = d3.select('#Url').node().value;
+
+				  $.get('http://api.soundcloud.com/resolve.json?url=' + scUrl + '&client_id=' + clientId, function (result) {
+					  console.log(result);
+					  tsneMusicVisualizer.loadMusicFromUrl(result.stream_url + "?client_id=" + clientId,loadSongCallback);
+>>>>>>> origin/master
 				  });
 				
 				});
