@@ -121,29 +121,21 @@
 				  });
 			  
 				  var clientId = "8ca2762e1ed85195aa49096d349eade0";
-<<<<<<< HEAD
+
 				  var scUrl = d3.select('#Url').node().value;
-=======
-<<<<<<< HEAD
+
 				  var scUrl = d3.select('#Url').attr('value');
->>>>>>> 0cb0cd579e2d3c5df154b9d2c13226ca67830403
+
 
 				  $.get('http://api.soundcloud.com/resolve.json?url=' + scUrl + '&client_id=' + clientId, function (result) {
 					  console.log(result);
 					  tsneMusicVisualizer.loadMusicFromUrl(result.stream_url + "?client_id=" + clientId, getBPM(),loadSongCallback);
-<<<<<<< HEAD
-=======
-=======
->>>>>>> 0cb0cd579e2d3c5df154b9d2c13226ca67830403
+
 				  var scUrl = d3.select('#Url').node().value;
 
 				  $.get('http://api.soundcloud.com/resolve.json?url=' + scUrl + '&client_id=' + clientId, function (result) {
 					  console.log(result);
 					  tsneMusicVisualizer.loadMusicFromUrl(result.stream_url + "?client_id=" + clientId,loadSongCallback);
-<<<<<<< HEAD
-=======
->>>>>>> origin/master
->>>>>>> 0cb0cd579e2d3c5df154b9d2c13226ca67830403
 				  });
 				
 				});
