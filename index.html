@@ -121,7 +121,7 @@
 				  });
 			  
 				  var clientId = "8ca2762e1ed85195aa49096d349eade0";
-				  var scUrl = d3.select('#Url').attr('value');
+				  var scUrl = d3.select('#Url').node().value;
 
 				  $.get('http://api.soundcloud.com/resolve.json?url=' + scUrl + '&client_id=' + clientId, function (result) {
 					  console.log(result);
