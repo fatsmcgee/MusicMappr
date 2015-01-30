@@ -242,6 +242,17 @@ TsneMusicVisualizer.prototype._getSampleLengthFromBpm = function(sampleRate,bpm,
 	return samplesPerBeat;
 }
 
+TsneMusicVisualizer._getChunkLength = function(sampleRate){
+	chunkLength = 2;
+	
+	while(chunkLength/sampleRate < .3){
+		chunkLength *= 2;
+	}
+	var prevChunkLength = chunkLength/2;
+	
+	return Math.abs(.3-chunkLength/sampleRate) < Math.abs(.3 -prevChunkLength/sampleRate)? chunkLength:prevChunkLength;
+}
+
 TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer, onFinish){
 
 	var self = this;
@@ -255,12 +266,13 @@ TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer, onFin
 		
 		self._musicBuffer = audioBuffer;
 		
-		var fftInputSize = 16384;
+		var fftInputSize = TsneMusicVisualizer._getChunkLength(audioBuffer.sampleRate);
 		
 
 		self._chunkLength = fftInputSize;
-		
-		
+
+		console.log("Not using bpm");
+	
 		var fftPadding = fftInputSize - self._chunkLength;
 		
 		self._chunkDuration = self._chunkLength/audioBuffer.sampleRate;
