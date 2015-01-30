@@ -267,12 +267,13 @@ TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer, onFin
 		
 		self._musicBuffer = audioBuffer;
 		
-		var fftInputSize = 16384;
+		var fftInputSize = TsneMusicVisualizer._getChunkLength(audioBuffer.sampleRate);
 		
 
 		self._chunkLength = fftInputSize;
 		
-		
+		console.log("Not using bpm");
+	
 		var fftPadding = fftInputSize - self._chunkLength;
 		
 		self._chunkDuration = self._chunkLength/audioBuffer.sampleRate;
