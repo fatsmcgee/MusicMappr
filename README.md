@@ -1,6 +1,8 @@
 MusicMappr
 ==========
 
+## Live demo here! http://fatsmcgee.github.io/MusicMappr/
+
 <b>What does it do?</b>
 
 MusicMappr finds chunks of songs that are similar, and clusters them accordingly. You can visualize these clusters and play them back at will. This is for music lovers who are curious about the structures inherent to their favorite songs.
