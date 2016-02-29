@@ -14,9 +14,9 @@
 		<script src="BeatDetector.js"></script>
 		<script src="http://ajax.googleapis.com/ajax/libs/jquery/2.0.2/jquery.min.js"></script>
 		<script src="http://connect.soundcloud.com/sdk.js"></script>
-		
+
 		<script>
-			
+
 		  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
 		  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
 		  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
@@ -27,27 +27,31 @@
 
 			var devMode = false;
 			var tsneMusicVisualizer = null;
-			var loadSongCallback;
-			
-			function onLoadSong(){
+			var songLoadedCallback;
+
+			function onSongLoaded(){
 				tsneMusicVisualizer.animate(function(){
 					tsneMusicVisualizer.getKMeans();
 				});
 			}
-			
+
+			function getSelectedUrl(){
+				return d3.select('#Url').node().value;
+			}
+
 			function toggleDevMode(){
 				devMode = !devMode;
 				if(devMode){
 					d3.selectAll(".DevMode").style("display","");
-					loadSongCallback = function(){};
+					songLoadedCallback = function(){};
 				}
 				else{
 					d3.selectAll(".DevMode").style("display","none");
-					loadSongCallback = onLoadSong;
+					songLoadedCallback = onSongLoaded;
 				}
 			}
-			
-			
+
+
 			function setupDevMode(){
 				d3.select("#AnimateStop").on("click",function(){
 					//if we click "Animate", start animation and set label to "Stop"
@@ -57,7 +61,7 @@
 							//when animation stops, change button back to "Animate"
 							self.value = "Animate";
 						});
-						
+
 						this.value = "Stop";
 					}
 					else{
@@ -65,16 +69,16 @@
 						self.value = "Animate";
 					}
 				});
-				
+
 				d3.select("#Step").on("click",function(){
 					tsneMusicVisualizer.stepAndDraw(d3.select('#Steps').attr('value'));
 				});
-				
+
 				d3.select("#RunClearKMeans").on("click",function(){
 					tsneMusicVisualizer.getKMeans();
 				});
 			}
-			
+
 			function getBPM(){
 				var text = d3.select("#BPM").node().value;
 				var bpm = parseFloat(text);
@@ -83,88 +87,115 @@
 				}
 				return undefined;
 			}
-			
-			function loadSoundcloudUrl(){
-			
+
+			function isEmbeddingRequested(){
+					return location.search.indexOf("?embeddable") != -1;
 			}
-			
+
 			window.addEventListener("load",function(){
-			
-			
-				tsneMusicVisualizer = new TsneMusicVisualizer("#PointsSvg","#SongSvg","#Audio");
-				
+
+				var isEmbedded = isEmbeddingRequested();
+
+				var songLoadedCallback = onSongLoaded;
+				var selectedSongCallback = function(){};
+				var logElement = document.getElementById("Log");
+				var pointsSvgElement = document.getElementById("PointsSvg");
+
+				if(isEmbedded){
+
+					document.getElementById("InfoPane").style.display = "none";
+					logElement = document.getElementById("EmbeddedLog");
+					logElement.style.display = "";
+					pointsSvgElement.style.display = "none";
+
+					songLoadedCallback = function(){
+						pointsSvgElement.style.display = "";
+						logElement.style.display = "none";
+						onSongLoaded();
+					}
+
+					selectedSongCallback = function(){
+						pointsSvgElement.style.display = "none";
+						logElement.value = "";
+						logElement.style.display = "";
+					}
+
+				}
+
+				tsneMusicVisualizer = new TsneMusicVisualizer("#PointsSvg","#SongSvg","#Audio",songLoadedCallback);
+
 				tsneMusicVisualizer.setLoggerCallback(function(msg){
-					logTa = document.getElementById("Log");
-					logTa.value = logTa.value + msg + "\n";
+					logElement.value = logElement.value + msg + "\n";
 				});
-				
-				loadSongCallback = onLoadSong;
-				
-				//var musicUrl = "Default.mp3";
-				
-				//tsneMusicVisualizer.loadMusicFromUrl(musicUrl,getBPM(),loadSongCallback);
-				
+
+
 				d3.select("#UseFile").on("click",function(){
-					tsneMusicVisualizer.loadMusicFromFileNode(d3.select("#File"),loadSongCallback);
+					selectedSongCallback();
+					tsneMusicVisualizer.loadMusicFromFileNode(d3.select("#File"));
 					document.getElementById("Log").value = "";
 				});
-				
+
 				d3.select("#UseUrl").on("click",function(){
-					
+					selectedSongCallback();
+					var url = getSelectedUrl();
+					tsneMusicVisualizer.loadMusicFromUrl(url)
 					document.getElementById("Log").value = "";
 				});
-				
+
 				d3.select("#UseSoundcloudUrl").on("click",function(){
+					selectedSongCallback();
 					SC.initialize({
 					client_id: clientId,
 					redirect_uri: "http://example.com/callback.html"
 				  });
-			  
+
 				  var clientId = "8ca2762e1ed85195aa49096d349eade0";
-				  var scUrl = d3.select('#Url').node().value;
+				  var scUrl = getSelectedUrl();
 
 				  $.get('http://api.soundcloud.com/resolve.json?url=' + scUrl + '&client_id=' + clientId, function (result) {
 					  console.log(result);
-					  tsneMusicVisualizer.loadMusicFromUrl(result.stream_url + "?client_id=" + clientId,loadSongCallback);
+					  tsneMusicVisualizer.loadMusicFromUrl(result.stream_url + "?client_id=" + clientId);
 				  });
-				
+
 				});
-				
+
 				d3.select("body").on("keypress.DevMode", function(){
 					if(d3.event.keyCode == 2 && d3.event.ctrlKey){
 						toggleDevMode();
 					}
 				});
-				
+
 				d3.selectAll(".DevMode").style("display","none");
-				
+
 				setupDevMode();
-			
+
 			});
+
 
 		</script>
 	</head>
 	<body>
 	<div id = "Visualizations" style="width:1020">
-		<div style="float:left">
-		<svg id="PointsSvg" width="500" height="500" style="border: 1px solid green">
-			<defs>
-				<radialGradient id="RadialGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-				  <stop offset="0%" style="stop-color:rgb(255,0,0);stop-opacity:.8" />
-				  <stop offset="100%" style="stop-color:rgb(255,0,0);stop-opacity:.2" />
-				</radialGradient>
-			</defs>
-		</svg>
+		<div style="float:left; border: 1px solid green; width:500px;height:500px">
+			<svg id="PointsSvg" width="500" height="500">
+				<defs>
+					<radialGradient id="RadialGradient" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
+					  <stop offset="0%" style="stop-color:rgb(255,0,0);stop-opacity:.8" />
+					  <stop offset="100%" style="stop-color:rgb(255,0,0);stop-opacity:.2" />
+					</radialGradient>
+				</defs>
+			</svg>
+			<textarea readonly id="EmbeddedLog" style="display:none;width:100%; height:100%; resize:none"></textarea>
 		</div>
-		<div style="float:right">
+		<div id="InfoPane" style="float:right">
 			<svg id="SongSvg" width="500" height="200" style="border: 1px solid orange">
 			</svg>
 			</br>
-			
+
 			<textarea readonly id="Log" style="width:500px; height:295px; resize:none"></textarea>
 		</div>
 	</div>
-	
+
 	<div id = "Inputs" style="clear:both">
 		<div class="DevMode">
 			<label for="Steps">Steps <input type="text" id="Steps" value="1"/> </label>
@@ -172,21 +203,21 @@
 			<input type="button" id="AnimateStop" value="Animate"/>
 			<input type="button" id="RunClearKMeans" value="Run K-Means"/>
 		</div>
-		
+
 		<div class="DevMode">
 			<label for="BPM">Beats Per Minute <input type="text" id="BPM" value=""/></label>
 		</div>
-		
+
 		<br/>
 		<audio id="Audio" controls="controls"></audio>
-		
+
 		</br>
 		<input type="file" id="File" value="Upload File" name="file" />
 		<input type="button" id="UseFile" value="Use This File"/>
-		
+
 		</br>
 		<!-- <input type="text" id="Url" value="http://upload.wikimedia.org/wikipedia/commons/1/1b/The_Entertainer_-_Scott_Joplin.ogg"/> -->
-		<input type="text" id="Url" value="https://soundcloud.com/flyinglotus/an-xbox-killed-my-dog"/> 
+		<input type="text" id="Url" value="https://soundcloud.com/flyinglotus/an-xbox-killed-my-dog"/>
 		<input type="button" id="UseUrl" value="Use File Url" />
 		<input type="button" id="UseSoundcloudUrl" value="Use Soundcloud Url" />
 	</div>
