@@ -1,58 +1,59 @@
 
-function TsneMusicVisualizer(pointCloudSvgNode,songVisualizerSvgNode,audioNode){
+function TsneMusicVisualizer(pointCloudSvgNode,songVisualizerSvgNode,audioNode,loadSongCallback){
 	this._tsne = new tsnejs.tSNE();
 	var AudioContext = window.AudioContext || window.webkitAudioContext;
 	this._audioContext = new AudioContext();
 	this._stopAnimatingSwitch = false;
-	
+	this._loadSongCallback = loadSongCallback;
+
 	this._convergenceCheckInterval = 50;
 	this._convergenceEpsilon = .02;
-	
+
 	//initialize the point cloud
 	this.initializePointCloud(pointCloudSvgNode);
 	this.initializeSongAmplitudeVisualizer(songVisualizerSvgNode);
 	this._audioNode = d3.select(audioNode).node();
-	
+
 	var self = this;
 	this._audioNode.onplay = function(){
-		
+
 		function timeout(lastIdx){
-			
+
 			if(lastIdx){
 				self._pointCloud.deHighlightIdx(lastIdx);
 				self._songAmplitudeViz.deHighlightIdx(lastIdx);
 			}
-			
+
 			if(self._audioNode.paused){
 				return;
 			}
-			
+
 			var currentTime = self._audioNode.currentTime;
 			var chunkIdx = ~~(currentTime/self._chunkDuration);
 			self._pointCloud.highlightIdx(chunkIdx);
 			self._songAmplitudeViz.highlightIdx(chunkIdx);
 			setTimeout(timeout.bind(self,chunkIdx),self._chunkDuration*1000);
 		}
-		
+
 		timeout();
 	}
-	
-	
+
+
 	//following variables unitialized until music is loaded
 	this._musicBuffer = null;
 	this._chunkLength = null;
 	this._chunkDuration = null;
-	
+
 	//unitialized until TSNE is loaded
 	this._lastCost = null;
 	this._costDiffs = null;
-	
+
 	//does nothing until explicity set elsewhere
 	this._loggerCallback = function(msg){};
-	
+
 	//initialize work ID so that song loading can be overridden
 	this._workId = 0;
-	
+
 }
 
 //Takes a function(string), where a string is a messaged to be logged from TsneMusicVisualizer
@@ -83,9 +84,9 @@ TsneMusicVisualizer.prototype.initializeSongAmplitudeVisualizer = function(songV
 
 TsneMusicVisualizer.prototype.initializePointCloud = function(pointCloudSvgNode){
 	var self = this;
-	
+
 	this._pointCloud = new PointCloudVisualizer(pointCloudSvgNode);
-	
+
 	//music chunks later in the song are colored lighter
 	this._pointCloud.setColoringFunction(this._chunkColoringFunction);
 	this._pointCloud.setMouseoverPointFunction(this._chunkMouseoverFunction.bind(this));
@@ -96,7 +97,7 @@ TsneMusicVisualizer.prototype.initializePointCloud = function(pointCloudSvgNode)
 	this._pointCloud.setDeHighlightedCallback(function(i){
 		self._songAmplitudeViz.deHighlightIdx(i);
 	});
-	
+
 	var playThroughClusterStopTrigger = {};
 
 	this._pointCloud.setToggleClusterCallback(function(clusterIdx,clusterIndices){
@@ -104,32 +105,32 @@ TsneMusicVisualizer.prototype.initializePointCloud = function(pointCloudSvgNode)
 		function timeout(i,lastIdx){
 			self._pointCloud.deHighlightIdx(lastIdx);
 			self._songAmplitudeViz.deHighlightIdx(lastIdx);
-			
+
 			if(playThroughClusterStopTrigger[clusterIdx] === true){
 				return;
 			}
 			var chunkIdx = clusterIndices[i];
 			var offset = chunkIdx * self._chunkDuration;
 			self._playSound(offset);
-			
+
 			self._pointCloud.highlightIdx(chunkIdx);
 			self._songAmplitudeViz.highlightIdx(chunkIdx);
-			
+
 			//play the next available chunk
 			i = (i+1) % clusterIndices.length;
 			setTimeout(timeout.bind(self,i,chunkIdx),self._chunkDuration*1000);
 		}
-		
+
 		timeout(0);
 	});
-	
+
 	this._pointCloud.setDeToggleClusterCallback(function(clusterIdx){
 		playThroughClusterStopTrigger[clusterIdx] = true;
 	});
 }
 
 TsneMusicVisualizer.prototype._chunkColoringFunction = function(chunkIdx,numChunks){
-	var greyVal = (chunkIdx/numChunks)*230; 
+	var greyVal = (chunkIdx/numChunks)*230;
 	return d3.rgb(greyVal,greyVal,greyVal);
 }
 
@@ -149,28 +150,28 @@ TsneMusicVisualizer.prototype._playSound = function(offset){
 	//source.stop(duration);
 }
 
-			
-TsneMusicVisualizer.prototype.loadMusicFromUrl = function(musicUrl,onFinish){
-	
+
+TsneMusicVisualizer.prototype.loadMusicFromUrl = function(musicUrl){
+
 	this._loggerCallback("Loading song from URL " + musicUrl + "...");
-	
+
 	request = new XMLHttpRequest();
-	
+
 	request.open('GET', musicUrl,true);
 	request.responseType = 'arraybuffer';
-	
+
 	var self = this;
 	request.onload = function(){
-	
+
 		self._loggerCallback("Song loaded.");
-		self._loadMusicFromBuffer(request.response,onFinish);
+		self._loadMusicFromBuffer(request.response);
 		self._audioNode.src = musicUrl;
 	}
-	
+
 	request.send();
 }
 
-TsneMusicVisualizer.prototype.loadMusicFromFileNode = function(fileNode,onFinish){
+TsneMusicVisualizer.prototype.loadMusicFromFileNode = function(fileNode){
 	var files = fileNode.node().files;
 	if (!files.length) {
 	  alert('Please select a file!');
@@ -180,15 +181,15 @@ TsneMusicVisualizer.prototype.loadMusicFromFileNode = function(fileNode,onFinish
 	file = files[0];
 
 	var reader = new FileReader();
-	
+
 	this._loggerCallback("Loading song from file " + file.name) + "...";
 
 	var self = this;
 	reader.onloadend = function(evt) {
 		self._loggerCallback("File loaded");
 	  if (evt.target.readyState == FileReader.DONE) { // DONE == 2
-		self._loadMusicFromBuffer(reader.result,onFinish);
-		
+		self._loadMusicFromBuffer(reader.result);
+
 		var createObjectUrl = webkitURL.createObjectURL || Url.createObjectURL;
 		var blob = new Blob([reader.result], {type: "audio/mpeg"});
 		url = createObjectUrl(blob);
@@ -207,17 +208,17 @@ TsneMusicVisualizer.prototype._updateSongVisualizer = function(){
 	var chunkAvgAmplitudes = new Float32Array(this._getNChunks());
 	bufferData = this._bufferData; //tight loop optimizations, avoid member lookup
 	var chunkLength = this._chunkLength;
-	
+
 	for(var i = 0,idx=0; i< bufferData.length; i+= chunkLength,idx++){
 		var chunkTotal = 0;
-		
+
 		for (var j = i; j<i+chunkLength; j++){
 			var sample = bufferData[j];
 			chunkTotal += sample || 0;
 		}
 		chunkAvgAmplitudes[idx] = chunkTotal;
 	}
-	
+
 	this._songAmplitudeViz.update(chunkAvgAmplitudes);
 	this._songAmplitudeViz.render();
 }
@@ -238,48 +239,46 @@ TsneMusicVisualizer.prototype._getSampleLengthFromBpm = function(sampleRate,bpm,
 	while(samplesPerBeat > maxChunkSize){
 		samplesPerBeat/=2;
 	}
-	samplesPerBeat = ~~samplesPerBeat; 
+	samplesPerBeat = ~~samplesPerBeat;
 	return samplesPerBeat;
 }
 
 TsneMusicVisualizer._getChunkLength = function(sampleRate){
 	chunkLength = 2;
-	
+
 	while(chunkLength/sampleRate < .3){
 		chunkLength *= 2;
 	}
 	var prevChunkLength = chunkLength/2;
-	
+
 	return Math.abs(.3-chunkLength/sampleRate) < Math.abs(.3 -prevChunkLength/sampleRate)? chunkLength:prevChunkLength;
 }
 
 TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer, onFinish){
 
 	var self = this;
-	
+
 	var workId = ++self._workId;
 	this._loggerCallback("Decoding audio data...");
-	
-	this._audioContext.decodeAudioData(arrayBuffer, function(audioBuffer){
-	
-		self._loggerCallback("Audio data decoded");
-		
-		self._musicBuffer = audioBuffer;
-		
-		var fftInputSize = TsneMusicVisualizer._getChunkLength(audioBuffer.sampleRate);
-		
 
+	this._audioContext.decodeAudioData(arrayBuffer, function(audioBuffer){
+
+		self._loggerCallback("Audio data decoded");
+
+		self._musicBuffer = audioBuffer;
+
+		var fftInputSize = TsneMusicVisualizer._getChunkLength(audioBuffer.sampleRate);
 		self._chunkLength = fftInputSize;
 
 		console.log("Not using bpm");
-	
+
 		var fftPadding = fftInputSize - self._chunkLength;
-		
+
 		self._chunkDuration = self._chunkLength/audioBuffer.sampleRate;
 		self._bufferData = audioBuffer.getChannelData(0);
 
 		var start = new Date();
-		
+
 		self._loggerCallback("Extracting features from audio data...");
 		self._getFeaturesFromMusicBufferAsync(workId,fftPadding,function(spectogramData){
 			self._loggerCallback("Features extracted");
@@ -287,14 +286,14 @@ TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer, onFin
 			console.log("Features took " + duration + " seconds to compute");
 			self._initTsne(spectogramData);
 			self.stepAndDraw();
-			
+
 			if(workId == self._workId){
-				onFinish && onFinish();
+				self._loadSongCallback && self._loadSongCallback();
 			}
 		});
-		
+
 		self._updateSongVisualizer();
-		
+
 	},function(e){alert('error' + e)});
 }
 
@@ -302,20 +301,20 @@ TsneMusicVisualizer.prototype._loadMusicFromBuffer = function(arrayBuffer, onFin
 //and performs some action on them when ready
 //TODO: instead of chunk padding, make into a more general feature extraction parameter object?
 TsneMusicVisualizer.prototype._getFeaturesFromMusicBufferAsync = function(workId,fftPadding,continuation){
-	
+
 	var chunkLength = this._chunkLength;
 	var bufferData = this._bufferData;
 	var nChunks = Math.floor(bufferData.length/chunkLength);
-	
-	
+
+
 	var datas = new Array(nChunks);
 	var processedChunks = 0;
-	
+
 	var numWorkers = 4;
 	var fftWorkers = [];
-	
+
 	var self = this;
-	
+
 	//event responding to a worker finishing its work and giving us output
 	//when all chunks have been processed we're done
 	function onWorkerMessage(evt){
@@ -326,84 +325,84 @@ TsneMusicVisualizer.prototype._getFeaturesFromMusicBufferAsync = function(workId
 			}
 			return;
 		}
-		
+
 		var output = evt.data;
-		datas[output.chunkNo] = output.features;  
+		datas[output.chunkNo] = output.features;
 		if(++processedChunks == nChunks){
 			continuation(datas);
-			
+
 		}
 	}
-	
+
 	for(var i = 0; i<numWorkers; i++){
 		fftWorkers.push(new Worker('feature_extraction_worker.js'));
 		fftWorkers[i].onmessage = onWorkerMessage;
 	}
-	
+
 	//raw sample data to be passed into webworker
 	//Go up to actual chunk length, and make the rest zeros (need to pad to power of 2 for faster fft)
 	var samples = new Float32Array(chunkLength+fftPadding);
-	
+
 	//the effective duration of the samples we pass to fft. Even though fftPadding of these samples are zero, still need to use the correct effective duration
 	//to make sure right frequencies are selected
 	var fftChunkDuration = (chunkLength+fftPadding)/this._musicBuffer.sampleRate;
-	
+
 	for(var i = 0; i<nChunks; i++){
-	
+
 		for(var j = 0; j<chunkLength; j++){
 			samples[j] = bufferData[chunkLength*i+j];
 		}
-		
+
 		var worker = fftWorkers[i%numWorkers];
 		worker.postMessage({chunkNo:i, samples:samples, chunkDuration:fftChunkDuration});
 	}
 }
 
 TsneMusicVisualizer.prototype._haveSolutionsConverged = function(oldPoints,newPoints){
-	
+
 	var oldXExtent = d3.extent(oldPoints, function(d){return d[0];});
 	var oldYExtent = d3.extent(oldPoints, function(d){return d[1];});
 	var newXExtent = d3.extent(newPoints, function(d){return d[0];});
 	var newYExtent = d3.extent(newPoints, function(d){return d[1];});
-	
+
 	var scaleOldX = d3.scale.linear().domain([oldXExtent[0], oldXExtent[1]]).range([0,1]);
 	var scaleOldY = d3.scale.linear().domain([oldYExtent[0], oldYExtent[1]]).range([0,1]);
-	
+
 	var scaleNewX = d3.scale.linear().domain([newXExtent[0], newXExtent[1]]).range([0,1]);
 	var scaleNewY = d3.scale.linear().domain([newYExtent[0], newYExtent[1]]).range([0,1]);
-	
+
 	var scaledEuclideanDists = d3.range(oldPoints.length).map(function(i){
 		var squaredDist = Math.pow(scaleNewY(newPoints[i][1])-scaleOldY(oldPoints[i][1]),2) + Math.pow(scaleNewX(newPoints[i][0])-scaleOldX(oldPoints[i][0]),2);
 		return Math.sqrt(squaredDist);
 	});
-	
+
 	var totalScaledEuclideanDist = d3.sum(scaledEuclideanDists);
 	var avgScaledEuclideanDist = totalScaledEuclideanDist/oldPoints.length;
 	console.log("Average scaled euclidean dist: " + avgScaledEuclideanDist);
-	
+
 	return avgScaledEuclideanDist < this._convergenceEpsilon;
 }
 
 TsneMusicVisualizer.prototype.step = function(steps){
 	var steps = steps || 1;
-	
+
 	for(var i = 0; i<steps; i++){
 		var cost = this._tsne.step();
 	}
-	
+
 	var costDiff = cost-this._lastCost;
 	this._lastCost = cost;
-	
+
 	var newPoints = this._tsne.getSolution();
 	if(this._stepNo % this._convergenceCheckInterval ==0){
 		if(this._lastSolutions.length == 2){
 			this._lastSolutions.shift();
 		}
-		
+
 		//tsne.getSolution() returns a reference, so we must clone
 		var pointsClone = newPoints.map(function(pt){return [pt[0],pt[1]];});
 		this._lastSolutions.push(pointsClone);
-		
+
 		if(this._stepNo >= this._convergenceCheckInterval){
 			if(this._haveSolutionsConverged(this._lastSolutions[0], this._lastSolutions[1])){
 				this.stopAnimate();
@@ -411,9 +410,9 @@ TsneMusicVisualizer.prototype.step = function(steps){
 			}
 		}
 	}
-	
+
 	this._pointCloud.update(newPoints);
-	
+
 	this._stepNo++;
 	return Math.abs(costDiff);
 }
@@ -437,7 +436,7 @@ TsneMusicVisualizer.prototype.animate = function(stopContinuation,notFirstIterat
 	if(!notFirstIteration){
 		this._loggerCallback("Optimizing soundscape...");
 	}
-	
+
 	this.stepAndDraw();
 	if(this._stopAnimatingSwitch){
 		this._loggerCallback("Soundscape optimized.");
@@ -448,14 +447,9 @@ TsneMusicVisualizer.prototype.animate = function(stopContinuation,notFirstIterat
 		return;
 	}
 	requestAnimationFrame(this.animate.bind(this,stopContinuation,true));
-	
+
 }
 
 TsneMusicVisualizer.prototype.getKMeans = function(){
 	this._pointCloud.getKMeans();
 }
-
-
-
-
-
